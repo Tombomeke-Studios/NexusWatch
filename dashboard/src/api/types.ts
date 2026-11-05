@@ -325,7 +325,7 @@ export interface Agent {
   status: HealthStatus;
 }
 
-export type ChannelId = 'discord' | 'email' | 'push';
+export type ChannelId = 'discord' | 'telegram' | 'email' | 'push';
 
 export interface Channel {
   id: ChannelId;

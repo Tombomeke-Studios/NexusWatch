@@ -37,4 +37,9 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 | `PATCH /alert-rules/:id` | `{ enabled: boolean }` | Enables or disables a rule |
 | `PATCH /settings` | any of `{ channels, routing, retention }` | Replaces the given settings sections |
 
+Notification channel ids are `discord`, `telegram`, `email` and `push`; `routing` has an entry for
+every channel under every severity (`critical`, `warning`, `info`). A Telegram target is a bot
+`sendMessage` URL with the chat id — the bot token is a secret and, like agent tokens, should only be
+returned masked once the backend stores real values.
+
 Agent tokens are only ever returned as a hint (last four characters); a full token is shown once, at creation.

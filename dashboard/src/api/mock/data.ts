@@ -434,14 +434,15 @@ const agents: Agent[] = [
 
 const channels: Channel[] = [
   { id: 'discord', name: 'Discord', description: 'Webhook to your own server', target: 'https://discord.com/api/webhooks/[ID]/[TOKEN]', enabled: true },
+  { id: 'telegram', name: 'Telegram', description: 'Bot message to a chat, group or channel', target: 'https://api.telegram.org/bot[BOT-TOKEN]/sendMessage?chat_id=[CHAT-ID]', enabled: false },
   { id: 'email', name: 'Email', description: 'SMTP through your home server', target: 'you@example.com', enabled: true },
   { id: 'push', name: 'Push (ntfy)', description: 'Instant notification on your phone', target: 'https://ntfy.sh/[YOUR-TOPIC]', enabled: true },
 ];
 
 const routing: SettingsData['routing'] = {
-  critical: { discord: true, email: true, push: true },
-  warning: { discord: true, email: false, push: false },
-  info: { discord: false, email: true, push: false },
+  critical: { discord: true, telegram: true, email: true, push: true },
+  warning: { discord: true, telegram: true, email: false, push: false },
+  info: { discord: false, telegram: false, email: true, push: false },
 };
 
 const retention: SettingsData['retention'] = [

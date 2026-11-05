@@ -88,6 +88,7 @@ function Agents({ data }: { data: SettingsData }) {
 
 const CHANNEL_COLUMNS: { id: ChannelId; label: string }[] = [
   { id: 'discord', label: 'Discord' },
+  { id: 'telegram', label: 'Telegram' },
   { id: 'email', label: 'Email' },
   { id: 'push', label: 'Push' },
 ];
@@ -122,14 +123,14 @@ function Notifications({ data }: { data: SettingsData }) {
       <Card labelledBy="rt">
         <CardHeader id="rt" title="Routing by severity" hint="which severity goes to which channel" />
         <div className="tbl">
-          <div className="tr th" style={{ minWidth: 560 }}>
+          <div className="tr th" style={{ minWidth: 640 }}>
             <span style={{ flex: '2 1 160px' }}>Severity</span>
             {CHANNEL_COLUMNS.map((c) => (
               <span key={c.id} style={{ flex: '1 1 90px', textAlign: 'center' }}>{c.label}</span>
             ))}
           </div>
           {SEVERITIES.map((sev) => (
-            <div key={sev} className="tr" style={{ minWidth: 560 }}>
+            <div key={sev} className="tr" style={{ minWidth: 640 }}>
               <span style={{ flex: '2 1 160px' }}><Pill tone={severityPill[sev]}>{severityLabel[sev]}</Pill></span>
               {CHANNEL_COLUMNS.map((ch) => {
                 const on = data.routing[sev][ch.id];
