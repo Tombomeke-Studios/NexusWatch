@@ -4,8 +4,7 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-### `feature/telegram-channel`
-- [x] Telegram as a notification channel: settings list, routing column, API contract (#—)
+_(no active branch)_
 
 ## Backlog
 
@@ -36,6 +35,9 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
+### `feature/telegram-channel` — merged into `dev`
+- [x] Telegram as a notification channel: settings list, routing column, API contract (#—)
+
 ### `feature/dashboard-foundation` — merged into `dev`
 - [x] Workspace, Vite + React + TypeScript, ESLint, Vitest (#—)
 - [x] Design tokens and component classes from the NexusWatch design, dark + light theme (#—)
