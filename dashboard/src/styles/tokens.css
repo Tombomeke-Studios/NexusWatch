@@ -1,0 +1,77 @@
+/*
+ * Design tokens — taken 1:1 from the NexusWatch Monitoring design.
+ * --primary is for text, borders and marks; --solid is for fills carrying white text.
+ * Never hard-code a hex colour in a component: add or reuse a token here.
+ */
+:root,
+[data-theme='dark'] {
+  --bg: #0b0e14;
+  --surface: #12161f;
+  --surface2: #1a1f2b;
+  --border: #262c3a;
+  --border2: #333b4d;
+  --text: #e7eaf0;
+  --muted: #9aa4b3;
+  --subtle: #8a93a2;
+  --primary: #818cf8;
+  --solid: #4f46e5;
+  --soft: #1e2333;
+  --ok: #4ade80;
+  --okS: rgba(34, 197, 94, 0.16);
+  --warn: #fbbf24;
+  --warnS: rgba(245, 158, 11, 0.16);
+  --down: #f87171;
+  --downS: rgba(239, 68, 68, 0.16);
+  --fv: #34d399;
+  --fvS: rgba(52, 211, 153, 0.14);
+  --c-nx: #818cf8;
+  --c-fv: #34d399;
+  --c-ok: #4ade80;
+  --c-warn: #fbbf24;
+  --c-down: #f87171;
+  --c-vi: #a78bfa;
+  --c-sky: #38bdf8;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  --side: rgba(18, 22, 31, 0.72);
+  --grid: rgba(255, 255, 255, 0.035);
+  --a1: 0.26;
+  --a2: 0.16;
+  --code: #0f131b;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #f6f7f9;
+  --surface: #fff;
+  --surface2: #f1f3f5;
+  --border: #e3e7ec;
+  --border2: #d3d9e0;
+  --text: #14171c;
+  --muted: #58616e;
+  --subtle: #636d7b;
+  --primary: #4f46e5;
+  --solid: #4f46e5;
+  --soft: #eef2ff;
+  --ok: #15803d;
+  --okS: #dcfce7;
+  --warn: #b45309;
+  --warnS: #fef3c7;
+  --down: #c42121;
+  --downS: #fee2e2;
+  --fv: #047857;
+  --fvS: #d1fae5;
+  --c-nx: #6366f1;
+  --c-fv: #10b981;
+  --c-ok: #22c55e;
+  --c-warn: #f59e0b;
+  --c-down: #ef4444;
+  --c-vi: #8b5cf6;
+  --c-sky: #0ea5e9;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.08);
+  --side: rgba(255, 255, 255, 0.82);
+  --grid: rgba(20, 23, 28, 0.05);
+  --a1: 0.12;
+  --a2: 0.09;
+  --code: #f1f3f5;
+  color-scheme: light;
+}
