@@ -166,6 +166,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/status.ts` | Status/level/severity/project → colour, pill class and label maps |
 | `lib/ranges.ts` | Time-range options + relative axis labels |
 | `lib/config.ts` | Typed Vite env (`useMocks`, `apiBase`, `refreshMs`) |
+| `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
+| `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
 | `components/layout/` | `AppShell` (background + sidebar + outlet), `Sidebar` (nav, alert badge, host card), `Logo` |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
 | `components/ui/primitives.tsx` | `Pill`, `StatusDot`, `Swatch`, `Segmented`, `Switch`, `Kpi`, `PageHeader` |
@@ -174,7 +176,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/ui/Icon.tsx` | The design's stroke icons by name |
 | `components/NodeCard.tsx` | Node with CPU/memory/disk meters (Heartbeats + NexusInfra) |
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
-| `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `NotFound` |
+| `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Business`, `Settings`, `NotFound` |
+| `pages/Business.tsx` · `Business.css` | `/business`: top-up reconciliation (KPIs, anomalies, pipeline), credit and standing, event bus health. Own stylesheet (`biz-*` classes) imported by the page |
 | `test/setup.ts` | jest-dom + in-memory localStorage (see gotchas) |
 
 ## 8. Conventions & gotchas
@@ -194,6 +197,11 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   `queries.ts`; never call `fetch` from a page.
 - **Node 25 ships its own `localStorage` global** that shadows jsdom's and has no working methods —
   `test/setup.ts` installs an in-memory one. Don't remove it.
+- **The backend reports top-up facts; the dashboard reconciles them** (`lib/reconcile.ts`). Never add a
+  verdict field (`anomaly`, `ok`) to `TopUpRecord` — the rules would then live in two places. Judge with
+  the response's `topUpTimeoutMs` and the query's `dataUpdatedAt`, not a constant or a fresh `Date.now()`.
+- **No personal data on the Business page.** Ids only; a payer email arrives masked and goes through
+  `maskEmail` again on display.
 - **Intl's short month names differ per ICU build** (`Sep` vs `Sept`), so `formatWhen` uses a fixed list.
 - **Nothing absolutely positioned inside a scrolling card unless the card is `position: relative`**
   (`.box` is). A `.sr-only` label that escapes its card makes the whole page scroll sideways on a phone.

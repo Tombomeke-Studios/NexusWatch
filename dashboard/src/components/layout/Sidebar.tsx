@@ -54,6 +54,10 @@ export function Sidebar() {
             FinVault
             <span className="cnt">{counts?.services.finvault ?? ''}</span>
           </NavLink>
+          <NavLink to={routes.business} className={navClass}>
+            <Swatch color="linear-gradient(135deg, var(--c-fv), var(--c-nx))" />
+            Business
+          </NavLink>
         </nav>
       </div>
 

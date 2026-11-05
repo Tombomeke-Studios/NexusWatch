@@ -12,4 +12,6 @@ export const routes = {
   service: (id: string) => `/services/${encodeURIComponent(id)}`,
   project: (id: ProjectId) => `/projects/${id}`,
   settings: '/settings',
+  /** Money flow FinVault → NexusInfra: top-up reconciliation, credit, event bus. */
+  business: '/business',
 } as const;

@@ -53,7 +53,7 @@ function Body({ data }: { data: FinVaultData }) {
       </section>
 
       <Card padded labelledBy="fn">
-        <CardHeader flat id="fn" title="Top-up funnel" hint="from request to credits at NexusInfra · today" link={{ to: routes.project('nexusinfra'), label: 'NexusInfra payments' }} />
+        <CardHeader flat id="fn" title="Top-up funnel" hint="from request to credits at NexusInfra · today" link={{ to: routes.business, label: 'Reconcile top-ups' }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {data.funnel.map((f, i) => {
             const prev = i ? data.funnel[i - 1].count : f.count;

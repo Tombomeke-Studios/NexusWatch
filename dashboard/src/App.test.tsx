@@ -27,6 +27,7 @@ describe('routing', () => {
     ['/projects/nexusinfra', 'NexusInfra'],
     ['/projects/finvault', 'FinVault'],
     ['/settings', 'Settings'],
+    ['/business', 'Business'],
     ['/nope', 'Page not found'],
   ])('%s renders the "%s" page heading', async (path, heading) => {
     renderAt(path);

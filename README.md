@@ -49,6 +49,7 @@ Open http://localhost:5173.
 | `/services/:id` | Service detail: outage banner, response time, checks, dependencies, logs, timeline |
 | `/projects/nexusinfra` | Nodes, containers, platform components, payments |
 | `/projects/finvault` | Top-up funnel, services, queues, transactions, security |
+| `/business` | Money flow FinVault → NexusInfra: top-up reconciliation and anomalies, credit and standing, suspensions, revenue per plan, event bus health |
 | `/settings` | Agents, notification channels and routing, retention, storage, theme |
 
 Docs: [architecture](docs/architecture.md) · [API contract](docs/api.md) · contributor rules in [CLAUDE.md](CLAUDE.md).

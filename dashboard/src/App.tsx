@@ -9,6 +9,7 @@ import { ServiceDetailPage } from '@/pages/ServiceDetail';
 import { NexusInfraPage } from '@/pages/projects/NexusInfra';
 import { FinVaultPage } from '@/pages/projects/FinVault';
 import { SettingsPage } from '@/pages/Settings';
+import { BusinessPage } from '@/pages/Business';
 import { NotFoundPage } from '@/pages/NotFound';
 
 /** Route table. Paths mirror `routes.ts`. */
@@ -25,6 +26,7 @@ export const routeTable: RouteObject[] = [
       { path: 'projects/nexusinfra', element: <NexusInfraPage /> },
       { path: 'projects/finvault', element: <FinVaultPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'business', element: <BusinessPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
