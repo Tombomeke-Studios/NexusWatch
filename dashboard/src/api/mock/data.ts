@@ -3,11 +3,20 @@
  * Deterministic (seeded) so screenshots and tests are stable; timestamps are relative to "now".
  */
 import { rng, walk } from '@/lib/series';
+import {
+  draftFromRule, evaluateRule, silenceEndsAt, validateDraft, validatePolicy, validateReason, validateWindow, windowCovers,
+  type Reading,
+} from '@/lib/rules';
+import { ApiError } from '../client';
 import type {
   ActiveAlert, Agent, AlertHistoryItem, AlertRule, AlertsData, Channel, ContainerRow, ContainerUsage,
   FinVaultData, HealthStatus, HeartbeatsData, HostInfo, Incident, LogEntry, LogLevel, LogQuery, LogsData,
   MetricData, MetricId, MetricsOverview, Monitor, NavCounts, NexusInfraData, NodeSummary, OverviewData,
   ProjectId, ServiceDetail, ServiceSummary, SettingsData,
+} from '../types';
+import type {
+  AlertNote, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleCondition,
+  RuleMetric, RuleTestResult, Silence, SilenceInput,
 } from '../types';
 
 const MIN = 60;
@@ -247,54 +256,296 @@ export function heartbeats(): HeartbeatsData {
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────
-const acknowledged = new Set<string>();
-const rules: AlertRule[] = [
-  { id: 'r1', name: 'Service down', condition: 'heartbeat == 0 for 3 checks', project: 'nexusinfra', severity: 'critical', channels: 'Discord + push', enabled: true },
-  { id: 'r2', name: 'Service down', condition: 'heartbeat == 0 for 3 checks', project: 'finvault', severity: 'critical', channels: 'Discord + push', enabled: true },
-  { id: 'r3', name: 'Node offline', condition: 'agent_last_seen > 90s', project: 'nexusinfra', severity: 'critical', channels: 'Discord + push', enabled: true },
-  { id: 'r4', name: 'Slow heartbeat', condition: 'heartbeat_ms > 100 for 5m', project: 'nexusinfra', severity: 'warning', channels: 'Discord', enabled: true },
-  { id: 'r5', name: 'High CPU', condition: 'cpu > 85% for 10m', project: 'nexusinfra', severity: 'warning', channels: 'Discord', enabled: true },
-  { id: 'r6', name: 'Queue backing up', condition: 'queue_ready > 25 for 5m', project: 'finvault', severity: 'warning', channels: 'Discord', enabled: true },
-  { id: 'r7', name: '5xx error rate', condition: 'error_rate > 2% for 5m', project: 'finvault', severity: 'warning', channels: 'email', enabled: true },
-  { id: 'r8', name: 'No top-ups', condition: 'topups == 0 for 6h', project: 'finvault', severity: 'info', channels: 'email', enabled: false },
+// In-memory alerting state: rules, policies, silences, maintenance windows, acks, resolutions, notes.
+let idCounter = 100;
+const nextId = (prefix: string) => `${prefix}_${++idCounter}`;
+const invalid = (message: string) => new ApiError(422, message);
+
+const policies: EscalationPolicy[] = [
+  { id: 'ep_oncall', name: 'On-call', steps: [{ channel: 'discord', afterMinutes: 0 }, { channel: 'telegram', afterMinutes: 5 }, { channel: 'push', afterMinutes: 15 }] },
+  { id: 'ep_office', name: 'Office hours', steps: [{ channel: 'email', afterMinutes: 0 }, { channel: 'discord', afterMinutes: 30 }] },
 ];
 
+const C = (metric: RuleMetric, comparator: RuleCondition['comparator'], threshold: number, forSeconds: number): RuleCondition => ({ metric, comparator, threshold, forSeconds });
+const RUNBOOKS = 'https://wiki.home.example/runbooks';
+const rules: AlertRule[] = [
+  { id: 'r1', name: 'Service down', project: 'nexusinfra', condition: C('heartbeat', '==', 0, 90), severity: 'critical', channels: ['discord', 'push'], escalationPolicyId: 'ep_oncall', runbookUrl: `${RUNBOOKS}/service-down`, enabled: true },
+  { id: 'r2', name: 'Service down', project: 'finvault', condition: C('heartbeat', '==', 0, 90), severity: 'critical', channels: ['discord', 'push'], escalationPolicyId: 'ep_oncall', runbookUrl: `${RUNBOOKS}/service-down`, enabled: true },
+  { id: 'r3', name: 'Disk almost full', project: 'nexusinfra', condition: C('disk', '>', 90, 15 * MIN), severity: 'critical', channels: ['discord', 'push'], escalationPolicyId: 'ep_oncall', runbookUrl: '', enabled: true },
+  { id: 'r4', name: 'Slow heartbeat', project: 'nexusinfra', condition: C('latency', '>', 100, 5 * MIN), severity: 'warning', channels: ['discord'], escalationPolicyId: 'ep_office', runbookUrl: '', enabled: true },
+  { id: 'r5', name: 'High CPU', project: 'nexusinfra', condition: C('cpu', '>', 85, 10 * MIN), severity: 'warning', channels: ['discord'], escalationPolicyId: null, runbookUrl: '', enabled: true },
+  { id: 'r6', name: 'Queue backing up', project: 'finvault', condition: C('queue_depth', '>', 25, 5 * MIN), severity: 'warning', channels: ['discord'], escalationPolicyId: null, runbookUrl: `${RUNBOOKS}/queues`, enabled: true },
+  { id: 'r7', name: '5xx error rate', project: 'finvault', condition: C('error_rate', '>', 2, 5 * MIN), severity: 'warning', channels: ['email'], escalationPolicyId: 'ep_office', runbookUrl: '', enabled: true },
+  { id: 'r8', name: 'No top-ups', project: 'finvault', condition: C('topups', '==', 0, 6 * HOUR), severity: 'info', channels: ['email'], escalationPolicyId: null, runbookUrl: '', enabled: false },
+];
+
+const acknowledgedAt = new Map<string, string>();
+const resolvedAt = new Map<string, string>();
+const alertNotes = new Map<string, AlertNote[]>();
+
+const silences: Silence[] = [
+  { id: 'sil_1', kind: 'rule', targetId: 'r7', label: '5xx error rate (FinVault)', reason: 'Known spike while the gateway redeploys', createdAt: ago(20 * MIN), endsAt: new Date(Date.now() + 40 * MIN * 1000).toISOString() },
+];
+
+/** This week's Sunday, 03:00 UTC: anchors the weekly backup window. */
+function sundayThreeAm(): string {
+  const d = new Date();
+  d.setUTCHours(3, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return d.toISOString();
+}
+
+const maintenance: MaintenanceWindow[] = [
+  { id: 'mw_1', title: 'node-02 memory upgrade', project: 'nexusinfra', serviceId: 'nx-agent-node-02', startsAt: ago(40 * MIN), durationMinutes: 120, recurrence: 'none' },
+  { id: 'mw_2', title: 'account-service database backup', project: 'finvault', serviceId: 'fv-account-service', startsAt: sundayThreeAm(), durationMinutes: 60, recurrence: 'weekly' },
+];
+
+const note = (kind: AlertNote['kind'], text: string, secondsAgo: number): AlertNote => ({ id: nextId('note'), kind, text, at: ago(secondsAgo) });
+
+/** The alerts the sample data has fired, before acks, silences and resolutions are applied. */
+const FIRED = [
+  { id: 'al_1', ruleId: 'r2', severity: 'critical' as const, project: 'finvault' as const, serviceId: 'fv-invoice-service', title: 'invoice-service is not responding',
+    description: 'The health check on :8003 returns ECONNREFUSED. The invoice.events queue is growing and invoices are not being processed.',
+    rule: 'heartbeat{service="invoice-service"} == 0 for 90s', startedSeconds: 16 * MIN, value: 'timeout', trend: walk(5, 40, 60, 6, { drift: -1.4 }) },
+  { id: 'al_2', ruleId: 'r4', severity: 'warning' as const, project: 'nexusinfra' as const, serviceId: 'nx-agent-node-02', title: 'node-02 is slow',
+    description: 'Heartbeat latency and CPU are above the threshold. The VM may be short on memory.',
+    rule: 'latency_ms{service="node-agent · node-02"} > 100 for 5m', startedSeconds: 32 * MIN, value: '140 ms', trend: walk(6, 40, 50, 10, { drift: 0.9 }) },
+];
+
+/** Drops silences that ran out, and "until resolved" silences whose alerts have resolved. */
+function pruneSilences(): void {
+  const now = Date.now();
+  const open = FIRED.filter((a) => !resolvedAt.has(a.id));
+  for (let i = silences.length - 1; i >= 0; i--) {
+    const s = silences[i];
+    const expired = s.endsAt !== null && Date.parse(s.endsAt) <= now;
+    const resolved = s.endsAt === null && (s.kind === 'alert' ? resolvedAt.has(s.targetId) : !open.some((a) => a.ruleId === s.targetId));
+    if (expired || resolved) silences.splice(i, 1);
+  }
+}
+
 function activeAlerts(): ActiveAlert[] {
-  return [
-    { id: 'al_1', severity: 'critical', project: 'finvault', serviceId: 'fv-invoice-service', title: 'invoice-service is not responding',
-      description: 'The health check on :8003 returns ECONNREFUSED. The invoice.events queue is growing and invoices are not being processed.',
-      rule: 'heartbeat{service="invoice-service"} == 0 for 3 checks', startedAt: ago(16 * MIN), durationSeconds: 16 * MIN, value: 'timeout', trend: walk(5, 40, 60, 6, { drift: -1.4 }), acknowledged: acknowledged.has('al_1') },
-    { id: 'al_2', severity: 'warning', project: 'nexusinfra', serviceId: 'nx-agent-node-02', title: 'node-02 is slow',
-      description: 'Heartbeat latency and CPU are above the threshold. The VM may be short on memory.',
-      rule: 'node_heartbeat_ms{node="node-02"} > 100 for 5m', startedAt: ago(32 * MIN), durationSeconds: 32 * MIN, value: '140 ms', trend: walk(6, 40, 50, 10, { drift: 0.9 }), acknowledged: acknowledged.has('al_2') },
-  ];
+  pruneSilences();
+  const now = Date.now();
+  return FIRED.filter((a) => !resolvedAt.has(a.id)).map(({ startedSeconds, ...a }) => ({
+    ...a,
+    startedAt: ago(startedSeconds),
+    durationSeconds: startedSeconds,
+    acknowledged: acknowledgedAt.has(a.id),
+    acknowledgedAt: acknowledgedAt.get(a.id) ?? null,
+    silenceId: silences.find((s) => (s.kind === 'alert' && s.targetId === a.id) || (s.kind === 'rule' && s.targetId === a.ruleId))?.id ?? null,
+    maintenanceId: maintenance.find((w) => windowCovers(w, a, now))?.id ?? null,
+    notes: [...(alertNotes.get(a.id) ?? [])],
+  }));
+}
+
+const PAST_HISTORY: AlertHistoryItem[] = [
+  { id: 'h3', open: false, title: 'Queue wallet.events backing up', project: 'finvault', severity: 'warning', startedAt: ago(13 * HOUR), durationSeconds: 12 * MIN, notes: [note('acknowledged', 'Restarting the wallet consumer', 13 * HOUR - 3 * MIN), note('resolved', 'Consumer back, queue drained', 13 * HOUR - 12 * MIN)] },
+  { id: 'h4', open: false, title: 'High CPU on node-02', project: 'nexusinfra', severity: 'warning', startedAt: ago(17 * HOUR), durationSeconds: 27 * MIN, notes: [] },
+  { id: 'h5', open: false, title: '5xx error rate above 2%', project: 'finvault', severity: 'warning', startedAt: ago(2 * DAY), durationSeconds: 6 * MIN, notes: [] },
+  { id: 'h6', open: false, title: 'node-agent node-02 offline', project: 'nexusinfra', severity: 'critical', startedAt: ago(2 * DAY + 8 * HOUR), durationSeconds: 8 * MIN, notes: [note('resolved', 'VM rebooted after a kernel update', 2 * DAY + 8 * HOUR - 8 * MIN)] },
+  { id: 'h7', open: false, title: 'Slow heartbeat api-gateway', project: 'nexusinfra', severity: 'warning', startedAt: ago(3 * DAY), durationSeconds: 4 * MIN, notes: [] },
+];
+
+function history(): AlertHistoryItem[] {
+  const fired = FIRED.map((a, i): AlertHistoryItem => {
+    const resolved = resolvedAt.get(a.id);
+    const startedMs = Date.now() - a.startedSeconds * 1000;
+    return {
+      id: `h${i + 1}`, alertId: a.id, open: !resolved, title: a.title, project: a.project, severity: a.severity, startedAt: ago(a.startedSeconds),
+      durationSeconds: resolved ? Math.max(0, Math.round((Date.parse(resolved) - startedMs) / 1000)) : a.startedSeconds,
+      notes: [...(alertNotes.get(a.id) ?? [])],
+    };
+  });
+  return [...fired, ...PAST_HISTORY.map((h) => ({ ...h, notes: [...h.notes] }))];
 }
 
 export function alerts(): AlertsData {
-  const H = (id: string, open: boolean, title: string, project: ProjectId, secondsAgo: number, durationSeconds: number): AlertHistoryItem => ({ id, open, title, project, startedAt: ago(secondsAgo), durationSeconds });
+  const active = activeAlerts();
   return {
-    summary: { critical: 1, warning: 1, muted: 0, resolved24h: 5, resolvedAuto24h: 3, mttrMinutes: 14 },
-    active: activeAlerts(),
-    rules: rules.map((r) => ({ ...r })),
-    history: [
-      H('h1', true, 'invoice-service is not responding', 'finvault', 16 * MIN, 16 * MIN),
-      H('h2', true, 'node-02 is slow', 'nexusinfra', 32 * MIN, 32 * MIN),
-      H('h3', false, 'Queue wallet.events backing up', 'finvault', 13 * HOUR, 12 * MIN),
-      H('h4', false, 'High CPU on node-02', 'nexusinfra', 17 * HOUR, 27 * MIN),
-      H('h5', false, '5xx error rate above 2%', 'finvault', 2 * DAY, 6 * MIN),
-      H('h6', false, 'node-agent node-02 offline', 'nexusinfra', 2 * DAY + 8 * HOUR, 8 * MIN),
-      H('h7', false, 'Slow heartbeat api-gateway', 'nexusinfra', 3 * DAY, 4 * MIN),
-    ],
+    summary: {
+      critical: active.filter((a) => a.severity === 'critical').length,
+      warning: active.filter((a) => a.severity === 'warning').length,
+      muted: silences.length,
+      inMaintenance: active.filter((a) => a.maintenanceId).length,
+      resolved24h: 5 + resolvedAt.size,
+      resolvedAuto24h: 3,
+      mttrMinutes: 14,
+    },
+    active,
+    rules: rules.map((r) => structuredClone(r)),
+    history: history(),
+    silences: silences.map((s) => ({ ...s })),
+    maintenance: maintenance.map((w) => ({ ...w })),
+    policies: policies.map((p) => structuredClone(p)),
+    services: services.map(({ id, name, project }) => ({ id, name, project })),
   };
 }
 
-export function acknowledgeAlert(id: string): void {
-  acknowledged.add(id);
+function firedAlert(id: string) {
+  const a = FIRED.find((x) => x.id === id && !resolvedAt.has(x.id));
+  if (!a) throw new ApiError(404, `Alert ${id} is not active`);
+  return a;
+}
+
+function addNote(alertId: string, kind: AlertNote['kind'], text = ''): void {
+  alertNotes.set(alertId, [...(alertNotes.get(alertId) ?? []), { id: nextId('note'), kind, text: text.trim(), at: new Date().toISOString() }]);
+}
+
+/** Acknowledging stops the escalation; the optional note lands in the alert's history. */
+export function acknowledgeAlert(id: string, noteText = ''): void {
+  firedAlert(id);
+  if (acknowledgedAt.has(id)) return;
+  acknowledgedAt.set(id, new Date().toISOString());
+  addNote(id, 'acknowledged', noteText);
+}
+
+export function resolveAlert(id: string, noteText = ''): void {
+  firedAlert(id);
+  resolvedAt.set(id, new Date().toISOString());
+  addNote(id, 'resolved', noteText);
+  pruneSilences();
+}
+
+function checkRule(input: AlertRuleInput): AlertRuleInput {
+  const { errors, rule } = validateDraft(draftFromRule({ ...input, id: '' }));
+  if (!rule) throw invalid(Object.values(errors)[0] ?? 'Invalid rule');
+  if (input.escalationPolicyId && !policies.some((p) => p.id === input.escalationPolicyId)) throw invalid('Unknown escalation policy');
+  return rule;
+}
+
+export function createRule(input: AlertRuleInput): AlertRule {
+  const rule = { id: nextId('r'), ...checkRule(input) };
+  rules.push(rule);
+  return structuredClone(rule);
+}
+
+export function updateRule(id: string, input: AlertRuleInput): AlertRule {
+  const i = rules.findIndex((r) => r.id === id);
+  if (i < 0) throw new ApiError(404, `Rule ${id} not found`);
+  rules[i] = { id, ...checkRule(input) };
+  return structuredClone(rules[i]);
+}
+
+/** Deleting a rule also lifts the silences on it. */
+export function deleteRule(id: string): void {
+  const i = rules.findIndex((r) => r.id === id);
+  if (i < 0) throw new ApiError(404, `Rule ${id} not found`);
+  rules.splice(i, 1);
+  for (let j = silences.length - 1; j >= 0; j--) if (silences[j].kind === 'rule' && silences[j].targetId === id) silences.splice(j, 1);
 }
 
 export function setRuleEnabled(id: string, enabled: boolean): void {
   const rule = rules.find((r) => r.id === id);
   if (rule) rule.enabled = enabled;
+}
+
+/** Current samples per target and metric, as the collector would hold them. Unknown answers stay null. */
+export function readings(): { metric: RuleMetric; reading: Reading }[] {
+  const out: { metric: RuleMetric; reading: Reading }[] = [];
+  const add = (metric: RuleMetric, reading: Reading) => out.push({ metric, reading });
+  for (const s of services) {
+    const base = { target: s.name, project: s.project, serviceId: s.id, stepSeconds: 30 };
+    add('heartbeat', { ...base, samples: s.beats.map((b) => (b === 'down' ? 0 : 1)) });
+    add('latency', { ...base, samples: s.beats.slice(-20).map((b) => (b === 'down' ? null : s.latencyMs)) });
+  }
+  const GAUGE_METRIC: Record<string, RuleMetric> = { CPU: 'cpu', Memory: 'memory', Disk: 'disk' };
+  for (const n of nodes) {
+    for (const g of n.gauges) {
+      const samples = walk(n.name.length * 7 + g.label.length, 30, g.pct, 3, { min: Math.max(0, g.pct - 3), max: Math.min(100, g.pct + 3) });
+      samples[samples.length - 1] = g.pct;
+      add(GAUGE_METRIC[g.label], { target: `${n.name} ${g.label.toLowerCase()}`, project: 'nexusinfra', samples, stepSeconds: 60 });
+    }
+  }
+  const fv = finVault();
+  for (const q of fv.queues) {
+    // wallet.events has only just crossed its threshold: a rule with "for 5m" is still pending.
+    const samples = q.ready > q.threshold ? [18, 19, 21, 22, 24, 31, 38, q.ready] : Array.from({ length: 8 }, () => q.ready);
+    add('queue_depth', { target: q.name, project: 'finvault', samples, stepSeconds: 60 });
+  }
+  for (const s of fv.services) add('error_rate', { target: s.service.name, project: s.service.project, serviceId: s.service.id, samples: Array.from({ length: 10 }, () => s.errorPct), stepSeconds: 60 });
+  add('topups', { target: 'top-ups', project: 'finvault', samples: fv.topupsPerHour.slice(-24), stepSeconds: HOUR });
+  return out;
+}
+
+/** Evaluates a rule (saved or not) against the current sample data. */
+export function testRule(input: Pick<AlertRuleInput, 'project' | 'condition'>): RuleTestResult {
+  const relevant = readings().filter((r) => r.metric === input.condition.metric).map((r) => r.reading);
+  const { fires, targets } = evaluateRule(input, relevant);
+  return { evaluatedAt: new Date().toISOString(), fires, targets };
+}
+
+export function createSilence(input: SilenceInput): Silence {
+  const reasonError = validateReason(input.reason);
+  if (reasonError) throw invalid(reasonError);
+  let label: string;
+  if (input.kind === 'alert') {
+    label = firedAlert(input.targetId).title;
+  } else {
+    const rule = rules.find((r) => r.id === input.targetId);
+    if (!rule) throw new ApiError(404, `Rule ${input.targetId} not found`);
+    if (input.duration === 'resolved' && !activeAlerts().some((a) => a.ruleId === rule.id)) throw invalid('This rule has no active alert to wait for');
+    label = `${rule.name} (${rule.project === 'finvault' ? 'FinVault' : 'NexusInfra'})`;
+  }
+  const silence: Silence = { id: nextId('sil'), kind: input.kind, targetId: input.targetId, label, reason: input.reason.trim(), createdAt: new Date().toISOString(), endsAt: silenceEndsAt(input.duration, Date.now()) };
+  silences.push(silence);
+  return { ...silence };
+}
+
+export function deleteSilence(id: string): void {
+  const i = silences.findIndex((s) => s.id === id);
+  if (i >= 0) silences.splice(i, 1);
+}
+
+function checkWindow(input: MaintenanceInput): MaintenanceInput {
+  const first = Object.values(validateWindow(input))[0];
+  if (first) throw invalid(first);
+  if (input.serviceId && byId(input.serviceId)?.project !== input.project) throw invalid('That service is not part of this project');
+  return { ...input, title: input.title.trim(), startsAt: new Date(input.startsAt).toISOString() };
+}
+
+export function createMaintenance(input: MaintenanceInput): MaintenanceWindow {
+  const w = { id: nextId('mw'), ...checkWindow(input) };
+  maintenance.push(w);
+  return { ...w };
+}
+
+export function updateMaintenance(id: string, input: MaintenanceInput): MaintenanceWindow {
+  const i = maintenance.findIndex((w) => w.id === id);
+  if (i < 0) throw new ApiError(404, `Maintenance window ${id} not found`);
+  maintenance[i] = { id, ...checkWindow(input) };
+  return { ...maintenance[i] };
+}
+
+export function deleteMaintenance(id: string): void {
+  const i = maintenance.findIndex((w) => w.id === id);
+  if (i >= 0) maintenance.splice(i, 1);
+}
+
+function checkPolicy(input: EscalationPolicyInput): EscalationPolicyInput {
+  const first = Object.values(validatePolicy(input))[0];
+  if (first) throw invalid(first);
+  return { name: input.name.trim(), steps: input.steps.map((s) => ({ ...s })) };
+}
+
+export function createPolicy(input: EscalationPolicyInput): EscalationPolicy {
+  const p = { id: nextId('ep'), ...checkPolicy(input) };
+  policies.push(p);
+  return structuredClone(p);
+}
+
+export function updatePolicy(id: string, input: EscalationPolicyInput): EscalationPolicy {
+  const i = policies.findIndex((p) => p.id === id);
+  if (i < 0) throw new ApiError(404, `Escalation policy ${id} not found`);
+  policies[i] = { id, ...checkPolicy(input) };
+  return structuredClone(policies[i]);
+}
+
+/** Deleting a policy detaches it from every rule that used it. */
+export function deletePolicy(id: string): void {
+  const i = policies.findIndex((p) => p.id === id);
+  if (i >= 0) policies.splice(i, 1);
+  for (const r of rules) if (r.escalationPolicyId === id) r.escalationPolicyId = null;
 }
 
 // ── Service detail ─────────────────────────────────────────────────────

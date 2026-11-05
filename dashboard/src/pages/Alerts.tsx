@@ -9,6 +9,7 @@ import { EmptyState, QueryState } from '@/components/ui/QueryState';
 import { config } from '@/lib/config';
 import { formatDuration, formatWhen } from '@/lib/format';
 import { projectColor, projectName, projectPill, severityLabel, severityPill } from '@/lib/status';
+import { formatCondition } from '@/lib/rules';
 import { routes } from '@/routes';
 
 type Tab = 'active' | 'rules' | 'history';
@@ -94,7 +95,7 @@ function ActiveAlerts({ data }: { data: AlertsData }) {
             <Sparkline values={a.trend} color={a.severity === 'critical' ? 'var(--c-down)' : 'var(--c-warn)'} label="Trend" height={40} />
           </div>
           <div style={{ flex: '0 1 190px', display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
-            <button type="button" className="btn pri" disabled={a.acknowledged || ack.isPending} onClick={() => ack.mutate(a.id)}>
+            <button type="button" className="btn pri" disabled={a.acknowledged || ack.isPending} onClick={() => ack.mutate({ id: a.id })}>
               {a.acknowledged ? 'Acknowledged' : 'Acknowledge'}
             </button>
             <button type="button" className="btn" disabled title="Coming soon">Mute for 1 hour</button>
@@ -126,7 +127,7 @@ function Rules({ data }: { data: AlertsData }) {
         {data.rules.map((r) => (
           <div key={r.id} className="tr" style={{ minWidth: 820 }}>
             <span style={{ flex: '2 1 200px', fontWeight: 600 }}>{r.name}</span>
-            <span className="mono muted" style={{ flex: '3 1 280px', fontSize: 12.5 }}>{r.condition}</span>
+            <span className="mono muted" style={{ flex: '3 1 280px', fontSize: 12.5 }}>{formatCondition(r.condition)}</span>
             <span className="muted" style={{ flex: '1 1 110px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Swatch color={projectColor[r.project]} />
               {projectName[r.project]}

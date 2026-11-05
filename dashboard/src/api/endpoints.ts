@@ -10,6 +10,10 @@ import type {
   AlertsData, FinVaultData, HeartbeatsData, HostInfo, LogQuery, LogsData, MetricData, MetricId,
   MetricsOverview, NavCounts, NexusInfraData, OverviewData, ServiceDetail, SettingsData, TimeRange,
 } from './types';
+import type {
+  AlertRule, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleTestResult, Silence,
+  SilenceInput,
+} from './types';
 
 /** Simulated latency so loading states are visible while working on mocks. */
 const MOCK_DELAY_MS = 180;
@@ -48,12 +52,41 @@ export const api = {
   heartbeats: (): Promise<HeartbeatsData> => (config.useMocks ? fromMock(mock.heartbeats) : request('/heartbeats')),
 
   alerts: (): Promise<AlertsData> => (config.useMocks ? fromMock(mock.alerts) : request('/alerts')),
-  acknowledgeAlert: (id: string): Promise<void> =>
-    config.useMocks ? fromMock(() => mock.acknowledgeAlert(id)) : request(`/alerts/${id}/ack`, { method: 'POST' }),
+  acknowledgeAlert: (id: string, note = ''): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.acknowledgeAlert(id, note)) : request(`/alerts/${id}/ack`, { method: 'POST', body: json({ note }) }),
+  resolveAlert: (id: string, note = ''): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.resolveAlert(id, note)) : request(`/alerts/${id}/resolve`, { method: 'POST', body: json({ note }) }),
   setRuleEnabled: (id: string, enabled: boolean): Promise<void> =>
     config.useMocks
       ? fromMock(() => mock.setRuleEnabled(id, enabled))
       : request(`/alert-rules/${id}`, { method: 'PATCH', body: json({ enabled }) }),
+  createRule: (rule: AlertRuleInput): Promise<AlertRule> =>
+    config.useMocks ? fromMock(() => mock.createRule(rule)) : request('/alert-rules', { method: 'POST', body: json(rule) }),
+  updateRule: (id: string, rule: AlertRuleInput): Promise<AlertRule> =>
+    config.useMocks ? fromMock(() => mock.updateRule(id, rule)) : request(`/alert-rules/${id}`, { method: 'PUT', body: json(rule) }),
+  deleteRule: (id: string): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.deleteRule(id)) : request(`/alert-rules/${id}`, { method: 'DELETE' }),
+  testRule: (rule: Pick<AlertRuleInput, 'project' | 'condition'>): Promise<RuleTestResult> =>
+    config.useMocks ? fromMock(() => mock.testRule(rule)) : request('/alert-rules/test', { method: 'POST', body: json(rule) }),
+
+  createSilence: (input: SilenceInput): Promise<Silence> =>
+    config.useMocks ? fromMock(() => mock.createSilence(input)) : request('/silences', { method: 'POST', body: json(input) }),
+  deleteSilence: (id: string): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.deleteSilence(id)) : request(`/silences/${id}`, { method: 'DELETE' }),
+
+  createMaintenance: (input: MaintenanceInput): Promise<MaintenanceWindow> =>
+    config.useMocks ? fromMock(() => mock.createMaintenance(input)) : request('/maintenance-windows', { method: 'POST', body: json(input) }),
+  updateMaintenance: (id: string, input: MaintenanceInput): Promise<MaintenanceWindow> =>
+    config.useMocks ? fromMock(() => mock.updateMaintenance(id, input)) : request(`/maintenance-windows/${id}`, { method: 'PUT', body: json(input) }),
+  deleteMaintenance: (id: string): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.deleteMaintenance(id)) : request(`/maintenance-windows/${id}`, { method: 'DELETE' }),
+
+  createPolicy: (input: EscalationPolicyInput): Promise<EscalationPolicy> =>
+    config.useMocks ? fromMock(() => mock.createPolicy(input)) : request('/escalation-policies', { method: 'POST', body: json(input) }),
+  updatePolicy: (id: string, input: EscalationPolicyInput): Promise<EscalationPolicy> =>
+    config.useMocks ? fromMock(() => mock.updatePolicy(id, input)) : request(`/escalation-policies/${id}`, { method: 'PUT', body: json(input) }),
+  deletePolicy: (id: string): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.deletePolicy(id)) : request(`/escalation-policies/${id}`, { method: 'DELETE' }),
 
   service: (id: string): Promise<ServiceDetail> =>
     config.useMocks
