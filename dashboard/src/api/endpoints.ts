@@ -6,9 +6,13 @@
 import { config } from '@/lib/config';
 import { ApiError, request } from './client';
 import * as mock from './mock/data';
+import * as reliability from './mock/reliability';
 import type {
   AlertsData, FinVaultData, HeartbeatsData, HostInfo, LogQuery, LogsData, MetricData, MetricId,
   MetricsOverview, NavCounts, NexusInfraData, OverviewData, ServiceDetail, SettingsData, TimeRange,
+} from './types';
+import type {
+  IncidentDetail, IncidentsData, NewIncident, NewIncidentUpdate, ResolveIncident, SloData, StatusPageData,
 } from './types';
 
 /** Simulated latency so loading states are visible while working on mocks. */
@@ -70,4 +74,28 @@ export const api = {
   settings: (): Promise<SettingsData> => (config.useMocks ? fromMock(mock.settings) : request('/settings')),
   updateSettings: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>): Promise<void> =>
     config.useMocks ? fromMock(() => mock.updateSettings(patch)) : request('/settings', { method: 'PATCH', body: json(patch) }),
+
+  // Reliability: SLOs, incidents and the public status page.
+  slos: (): Promise<SloData> => (config.useMocks ? fromMock(reliability.slos) : request('/slos')),
+  incidents: (): Promise<IncidentsData> => (config.useMocks ? fromMock(reliability.incidents) : request('/incidents')),
+  incident: (id: string): Promise<IncidentDetail> =>
+    config.useMocks
+      ? fromMock(() => {
+          const detail = reliability.incident(id);
+          if (!detail) throw new ApiError(404, `Incident ${id} not found`);
+          return detail;
+        })
+      : request(`/incidents/${encodeURIComponent(id)}`),
+  createIncident: (input: NewIncident): Promise<IncidentDetail> =>
+    config.useMocks ? fromMock(() => reliability.createIncident(input)) : request('/incidents', { method: 'POST', body: json(input) }),
+  postIncidentUpdate: (id: string, input: NewIncidentUpdate): Promise<IncidentDetail> =>
+    config.useMocks
+      ? fromMock(() => reliability.postIncidentUpdate(id, input))
+      : request(`/incidents/${encodeURIComponent(id)}/updates`, { method: 'POST', body: json(input) }),
+  resolveIncident: (id: string, input: ResolveIncident): Promise<IncidentDetail> =>
+    config.useMocks
+      ? fromMock(() => reliability.resolveIncident(id, input))
+      : request(`/incidents/${encodeURIComponent(id)}/resolve`, { method: 'POST', body: json(input) }),
+  /** Public and unauthenticated: the only call the shareable /status page makes. */
+  statusPage: (): Promise<StatusPageData> => (config.useMocks ? fromMock(reliability.statusPage) : request('/status')),
 };

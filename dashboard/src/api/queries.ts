@@ -6,6 +6,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { config } from '@/lib/config';
 import { api } from './endpoints';
 import type { LogQuery, MetricId, SettingsData, TimeRange } from './types';
+import type { NewIncident, NewIncidentUpdate, ResolveIncident } from './types';
 
 const live = { refetchInterval: config.refreshMs, placeholderData: keepPreviousData } as const;
 
@@ -22,6 +23,10 @@ export const keys = {
   nexusInfra: ['project', 'nexusinfra'] as const,
   finVault: ['project', 'finvault'] as const,
   settings: ['settings'] as const,
+  slos: ['slos'] as const,
+  incidents: ['incidents'] as const,
+  incident: (id: string) => ['incidents', id] as const,
+  statusPage: ['status-page'] as const,
 };
 
 export const useHost = () => useQuery({ queryKey: keys.host, queryFn: api.host, ...live });
@@ -60,4 +65,32 @@ export function useUpdateSettings() {
     mutationFn: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>) => api.updateSettings(patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
+}
+
+// ── Reliability ─────────────────────────────────────────────────────────
+export const useSlos = () => useQuery({ queryKey: keys.slos, queryFn: api.slos, ...live });
+export const useIncidents = () => useQuery({ queryKey: keys.incidents, queryFn: api.incidents, ...live });
+export const useIncident = (id: string) => useQuery({ queryKey: keys.incident(id), queryFn: () => api.incident(id), ...live });
+/** The public page refreshes once a minute: it is shared, so it must stay cheap. */
+export const useStatusPage = () => useQuery({ queryKey: keys.statusPage, queryFn: api.statusPage, refetchInterval: 60_000, placeholderData: keepPreviousData });
+
+/** Incident changes show up in the incident pages, Heartbeats and the public status page. */
+function useInvalidateIncidents() {
+  const qc = useQueryClient();
+  return () => Promise.all([keys.incidents, keys.heartbeats, keys.statusPage].map((queryKey) => qc.invalidateQueries({ queryKey })));
+}
+
+export function useCreateIncident() {
+  const invalidate = useInvalidateIncidents();
+  return useMutation({ mutationFn: (input: NewIncident) => api.createIncident(input), onSuccess: invalidate });
+}
+
+export function usePostIncidentUpdate(id: string) {
+  const invalidate = useInvalidateIncidents();
+  return useMutation({ mutationFn: (input: NewIncidentUpdate) => api.postIncidentUpdate(id, input), onSuccess: invalidate });
+}
+
+export function useResolveIncident(id: string) {
+  const invalidate = useInvalidateIncidents();
+  return useMutation({ mutationFn: (input: ResolveIncident) => api.resolveIncident(id, input), onSuccess: invalidate });
 }
