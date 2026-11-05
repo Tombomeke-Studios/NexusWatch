@@ -34,6 +34,11 @@ nexuswatch/agent on each node ──heartbeats, metrics, logs────┘
   (they may be encrypted), bind both `bank.payment.*` and `events.<type>` keys for FinVault events,
   and never rename the exchange or touch the encryption constants.
 - **Agent**: the `nexuswatch/agent` container shown in Settings, authenticated with a per-node token.
+- **Business view** (`/business`): the collector would read the Billing Bridge's top-up ledger, credit
+  ledger, standing and suspensions (hosted edition only), watch `payment.request` and FinVault's
+  `payment.confirmed`/`payment.failed` on the exchange (both key spellings), and ask the broker for queue
+  depths, consumers and `finvault.events.dlq`. It reports what each side recorded; the dashboard
+  reconciles (`lib/reconcile.ts`). Payer emails are masked before they leave the collector.
 
 Open decisions: authentication for the dashboard, storage engine, whether the collector reuses
 NexusInfra's Control Room data or measures independently.

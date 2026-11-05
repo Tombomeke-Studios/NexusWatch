@@ -9,6 +9,7 @@ import type {
   MetricData, MetricId, MetricsOverview, Monitor, NavCounts, NexusInfraData, NodeSummary, OverviewData,
   ProjectId, ServiceDetail, ServiceSummary, SettingsData,
 } from '../types';
+import type { AccountStanding, BusinessData, PlanRevenue, TopUpRecord } from '../types';
 
 const MIN = 60;
 const HOUR = 3600;
@@ -466,4 +467,118 @@ export function updateSettings(patch: Partial<Pick<SettingsData, 'channels' | 'r
   if (patch.channels) channels.splice(0, channels.length, ...patch.channels);
   if (patch.routing) Object.assign(routing, patch.routing);
   if (patch.retention) retention.splice(0, retention.length, ...patch.retention);
+}
+
+// ── Business ───────────────────────────────────────────────────────────
+// A week of top-ups between FinVault and NexusInfra. Most are healthy; a few break the Billing
+// Bridge's promises on purpose, so the reconciliation view has something to show. The story is
+// consistent with the rest of the sample: invoice-service went down 16 min ago, so the newest
+// requests are still waiting, and a confirmation that dead-lettered explains the DLQ depth.
+const TOPUP_TIMEOUT_MS = 30 * MIN * 1000;
+
+/** A healthy top-up `requestedMinAgo` minutes ago that the customer paid `payMin` minutes later. */
+function topUp(reference: string, accountId: string, amountEur: number, requestedMinAgo: number, patch: Partial<TopUpRecord> & { payMin?: number } = {}): TopUpRecord {
+  const { payMin = 4, ...rest } = patch;
+  const paidSecondsAgo = (requestedMinAgo - payMin) * MIN;
+  return {
+    reference, accountId, payer: null, amountEur,
+    requestedAt: ago(requestedMinAgo * MIN),
+    sent: true, status: 'confirmed', expiredAt: null,
+    finvault: { outcome: 'confirmed', at: ago(paidSecondsAgo), amountEur, reason: null },
+    credits: [{ at: ago(paidSecondsAgo - 1), amountEur }],
+    ...rest,
+  };
+}
+
+const unanswered = { status: 'pending', finvault: null, credits: [] } as const satisfies Partial<TopUpRecord>;
+
+const topUps: TopUpRecord[] = [
+  // In flight: invoice-service is down, so FinVault has not turned these into payment requests yet.
+  topUp('tu_8k2m', 'acc_31f', 10, 4, { ...unanswered, credits: [], payer: 'r***@p***.nl' }),
+  topUp('tu_8k1z', 'acc_07a', 25, 11, { ...unanswered, credits: [] }),
+  // Stuck past TOPUP_TIMEOUT_MS with no answer at all — what a mismatched message key looks like.
+  topUp('tu_8jx4', 'acc_52c', 20, 52, { ...unanswered, credits: [], status: 'not-confirmed', expiredAt: ago(22 * MIN), payer: 'm***@o***.com' }),
+  topUp('tu_8jv0', 'acc_18d', 25, 95, { payMin: 6, payer: 'd***@g***.com' }),
+  topUp('tu_8jq7', 'acc_11b', 50, 140, { payMin: 2 }),
+  // Confirmed, never credited: the confirmation dead-lettered before the bridge could read it.
+  topUp('tu_8jm2', 'acc_29e', 25, 190, { status: 'not-confirmed', expiredAt: ago(160 * MIN), payMin: 9, credits: [], payer: 'k***@g***.com' }),
+  // Late confirmation (#298): paid 1.5 h after the top-up turned Not confirmed, and credited.
+  topUp('tu_8jd9', 'acc_44f', 15, 300, { expiredAt: ago(270 * MIN), payMin: 120 }),
+  topUp('tu_8j8c', 'acc_07a', 10, 420, { payMin: 3 }),
+  topUp('tu_8j2r', 'acc_63a', 25, 610, { status: 'failed', finvault: { outcome: 'failed', at: ago(600 * MIN), amountEur: 25, reason: 'declined by customer' }, credits: [] }),
+  topUp('tu_8hw5', 'acc_18d', 50, 890, { payMin: 11 }),
+  // Not sent: the broker did not take payment.request, so it failed at once instead of waiting.
+  topUp('tu_8hr1', 'acc_31f', 10, 1260, { sent: false, status: 'failed', finvault: null, credits: [] }),
+  topUp('tu_8hk6', 'acc_75b', 100, 1500, { payMin: 5, payer: 's***@f***.be' }),
+  // Amount mismatch: FinVault confirmed €5 for a €50 request; the bridge credited nothing, as it should.
+  topUp('tu_8h9t', 'acc_52c', 50, 2100, { status: 'pending', finvault: { outcome: 'confirmed', at: ago(2094 * MIN), amountEur: 5, reason: null }, credits: [] }),
+  topUp('tu_8h3e', 'acc_11b', 25, 2800, { payMin: 2 }),
+  // Credited twice: two deliveries of one confirmation a second apart — the race #298 closed.
+  topUp('tu_8gx8', 'acc_29e', 20, 3400, { payMin: 3, credits: [{ at: ago(3397 * MIN - 1), amountEur: 20 }, { at: ago(3397 * MIN - 2), amountEur: 20 }] }),
+  topUp('tu_8gp3', 'acc_44f', 25, 4300, { payMin: 7 }),
+  topUp('tu_8gf1', 'acc_63a', 10, 5200, { status: 'failed', finvault: { outcome: 'failed', at: ago(5195 * MIN), amountEur: 10, reason: 'insufficient funds' }, credits: [] }),
+  topUp('tu_8g70', 'acc_75b', 50, 6100, { payMin: 4 }),
+  topUp('tu_8fz2', 'acc_18d', 25, 7400, { payMin: 1 }),
+  topUp('tu_8fq9', 'acc_07a', 25, 8600, { payMin: 6 }),
+  topUp('tu_8fh4', 'acc_86c', 15, 9300, { payMin: 3, payer: 'l***@h***.com' }),
+];
+
+function standing(accountId: string, planId: string, balanceEur: number, availableEur: number, hoursLeft: number | null, runningServers: number, lowCreditWarnedAt: string | null = null): AccountStanding {
+  return { accountId, planId, balanceEur, availableEur, canRun: availableEur > 0, hoursLeft, runningServers, lowCreditWarnedAt };
+}
+
+function plan(planId: string, name: string, color: PlanRevenue['color'], accounts: number, seed: number, base: number): PlanRevenue {
+  const perDay = walk(seed, 30, base, base * 0.5, { min: base * 0.4, max: base * 2 }).map((v) => Math.round(v * 100) / 100);
+  return { planId, name, color, accounts, perDay, revenueEur: Math.round(perDay.reduce((s, v) => s + v, 0) * 100) / 100 };
+}
+
+const CREDIT_OUT = 'credit exhausted — €0.00 left at settlement';
+
+export function business(): BusinessData {
+  return {
+    topUpTimeoutMs: TOPUP_TIMEOUT_MS,
+    lowCreditHours: 24,
+    topUps,
+    accounts: [
+      standing('acc_63a', 'starter', 0, 0, null, 0),
+      standing('acc_52c', 'standard', 1.2, 0.35, 6.4, 2, ago(3 * HOUR)),
+      standing('acc_31f', 'starter', 3.1, 1.9, 19, 1, ago(9 * HOUR)),
+      standing('acc_29e', 'standard', 44, 38.6, 210, 2),
+      standing('acc_07a', 'starter', 22.4, 20.1, 402, 1),
+      standing('acc_18d', 'pro', 96.5, 88.2, 131, 4),
+      standing('acc_11b', 'pro', 61, 57.3, 95, 3),
+      standing('acc_44f', 'standard', 18.7, 17.9, 160, 1),
+      standing('acc_75b', 'pro', 140, 140, null, 0),
+      standing('acc_86c', 'starter', 15, 15, null, 0),
+    ],
+    suspended: [
+      { deploymentId: 'dep_4c91', accountId: 'acc_63a', suspendedAt: ago(6 * HOUR + 12 * MIN), reason: CREDIT_OUT },
+      { deploymentId: 'dep_4c7e', accountId: 'acc_63a', suspendedAt: ago(6 * HOUR + 12 * MIN), reason: CREDIT_OUT },
+      { deploymentId: 'dep_3b20', accountId: 'acc_63a', suspendedAt: ago(DAY + 4 * HOUR), reason: 'short balance at the monthly cycle' },
+    ],
+    revenueByPlan: [
+      plan('starter', 'Starter', 'sky', 4, 301, 2.1),
+      plan('standard', 'Standard', 'vi', 3, 302, 4.6),
+      plan('pro', 'Pro', 'nx', 3, 303, 7.9),
+    ],
+    bus: {
+      exchange: 'finvault.events',
+      throughputPerMin: walk(311, 60, 42, 14, { min: 12, max: 90 }).map(Math.round),
+      dlq: { name: 'finvault.events.dlq', depth: 3, error: null, checkedAt: ago(20) },
+      outboxes: [
+        { service: 'billing-bridge', pending: 0, dropped: 0 },
+        { service: 'orchestrator', pending: 0, dropped: 0 },
+        { service: 'node-agent · node-01', pending: 0, dropped: 0 },
+        { service: 'node-agent · node-02', pending: 4, dropped: 0 },
+        { service: 'node-agent · node-03', pending: null, dropped: null },
+      ],
+      queues: [
+        { name: 'billing-bridge.payments', bindings: ['bank.payment.*', 'events.payment.*'], consumers: 1, ready: 0 },
+        { name: 'invoice-service.payment-requests', bindings: ['bank.payment.request'], consumers: 0, ready: 2 },
+        { name: 'invoice-service.statements', bindings: ['invoice.generate'], consumers: 0, ready: 0 },
+        { name: 'orchestrator.billing', bindings: ['billing.server.suspend', 'billing.credit.low'], consumers: 1, ready: 0 },
+        { name: 'control-room.heartbeats', bindings: ['monitoring.heartbeat.#'], consumers: null, ready: null },
+      ],
+    },
+  };
 }

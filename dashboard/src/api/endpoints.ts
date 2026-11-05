@@ -10,6 +10,7 @@ import type {
   AlertsData, FinVaultData, HeartbeatsData, HostInfo, LogQuery, LogsData, MetricData, MetricId,
   MetricsOverview, NavCounts, NexusInfraData, OverviewData, ServiceDetail, SettingsData, TimeRange,
 } from './types';
+import type { BusinessData } from './types';
 
 /** Simulated latency so loading states are visible while working on mocks. */
 const MOCK_DELAY_MS = 180;
@@ -66,6 +67,8 @@ export const api = {
 
   nexusInfra: (): Promise<NexusInfraData> => (config.useMocks ? fromMock(mock.nexusInfra) : request('/projects/nexusinfra')),
   finVault: (): Promise<FinVaultData> => (config.useMocks ? fromMock(mock.finVault) : request('/projects/finvault')),
+
+  business: (): Promise<BusinessData> => (config.useMocks ? fromMock(mock.business) : request('/business')),
 
   settings: (): Promise<SettingsData> => (config.useMocks ? fromMock(mock.settings) : request('/settings')),
   updateSettings: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>): Promise<void> =>
