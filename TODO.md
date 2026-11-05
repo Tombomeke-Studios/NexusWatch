@@ -4,7 +4,8 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-_(no active branch)_
+### `feature/telegram-channel`
+- [x] Telegram as a notification channel: settings list, routing column, API contract (#—)
 
 ## Backlog
 
@@ -14,6 +15,7 @@ _(no active branch)_
 - [ ] Poll NexusInfra Control Room `/status` + `/uptime` and every service's `/health` (#—)
 - [ ] Consume `monitoring.heartbeat.#` from the `finvault.events` exchange via `readPayload()` (#—)
 - [ ] Scrape Prometheus `/metrics` from NexusInfra services (#—)
+- [ ] Deliver notifications: Discord webhook, Telegram Bot API `sendMessage`, SMTP, ntfy — and the "Send test" button (#—)
 - [ ] Storage with retention per data kind (logs / metrics / heartbeats) (#—)
 - [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
 

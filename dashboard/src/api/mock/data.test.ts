@@ -44,6 +44,15 @@ describe('mock data', () => {
     expect(a.active.find((x) => x.id === 'al_1')?.acknowledged).toBe(true);
   });
 
+  it('routes every severity to every configured channel, Telegram included', () => {
+    const s = mock.settings();
+    const ids = s.channels.map((c) => c.id);
+    expect(ids).toContain('telegram');
+    for (const severity of ['critical', 'warning', 'info'] as const) {
+      expect(Object.keys(s.routing[severity]).sort()).toEqual([...ids].sort());
+    }
+  });
+
   it('returns a series per configured line for every metric', () => {
     for (const id of mock.metricIds) {
       const m = mock.metric(id);
