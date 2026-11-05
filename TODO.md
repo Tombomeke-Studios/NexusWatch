@@ -4,18 +4,7 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-### `feature/dashboard-foundation`
-- [x] Workspace, Vite + React + TypeScript, ESLint, Vitest (#—)
-- [x] Design tokens and component classes from the NexusWatch design, dark + light theme (#—)
-- [x] Typed API layer: contract types, fetch client, mock/HTTP switch, React Query hooks (#—)
-- [x] Sample data ported from the design (#—)
-- [x] App shell: sidebar, alert badge, host card, routing for all nine pages (#—)
-- [x] Pages: Overview, Metrics, Logs, Heartbeats, Alerts, Service detail, NexusInfra, FinVault, Settings (#—)
-- [x] Tests: chart maths, formatting, client, mock contract, every route renders (#—)
-- [x] CLAUDE.md, README, docs/architecture.md, docs/api.md (#—)
-- [x] Service detail: click a log line to unfold its full document (#—)
-- [x] Logs: deep link `/logs?q=…&entry=…` opens that search with the line selected (#—)
-- [x] Mock: healthy services no longer log failed health checks; stable log ids (#—)
+_(no active branch)_
 
 ## Backlog
 
@@ -45,4 +34,15 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
-_(nothing merged into `dev` yet)_
+### `feature/dashboard-foundation` — merged into `dev`
+- [x] Workspace, Vite + React + TypeScript, ESLint, Vitest (#—)
+- [x] Design tokens and component classes from the NexusWatch design, dark + light theme (#—)
+- [x] Typed API layer: contract types, fetch client, mock/HTTP switch, React Query hooks (#—)
+- [x] Sample data ported from the design (#—)
+- [x] App shell: sidebar, alert badge, host card, routing for all nine pages (#—)
+- [x] Pages: Overview, Metrics, Logs, Heartbeats, Alerts, Service detail, NexusInfra, FinVault, Settings (#—)
+- [x] Tests: chart maths, formatting, client, mock contract, every route renders (#—)
+- [x] CLAUDE.md, README, docs/architecture.md, docs/api.md (#—)
+- [x] Service detail: click a log line to unfold its full document (#—)
+- [x] Logs: deep link `/logs?q=…&entry=…` opens that search with the line selected (#—)
+- [x] Mock: healthy services no longer log failed health checks; stable log ids (#—)
