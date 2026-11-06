@@ -4,13 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
-    "dashboard"
+    "dashboard",
+    "collector"
   ],
   "scripts": {
-    "dev": "npm --workspace dashboard run dev",
-    "build": "npm --workspace dashboard run build",
+    "dev": "node scripts/dev.mjs",
+    "dev:mocks": "npm --workspace dashboard run dev",
+    "dev:collector": "npm --workspace collector run dev",
+    "start:collector": "npm --workspace collector run start",
+    "build": "npm --workspace dashboard run build && npm --workspace collector run build",
     "lint": "eslint .",
-    "test": "npm --workspace dashboard run test"
+    "test": "npm --workspace dashboard run test && npm --workspace collector run test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

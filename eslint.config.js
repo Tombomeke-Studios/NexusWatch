@@ -16,4 +16,8 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  {
+    files: ['collector/**/*.ts', 'scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
 );

@@ -1,0 +1,224 @@
+/**
+ * Contract tests: the invariants of dashboard/src/api/mock/data.test.ts, checked against the
+ * collector's HTTP responses — once with no source configured (everything from sample data) and
+ * once with live sources (health targets, node heartbeats, a Prometheus scrape) fed by fakes.
+ */
+import type { AddressInfo } from 'node:net';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { loadConfig } from './config.js';
+import type * as C from './contract.js';
+import { createApp } from './server.js';
+import { HeartbeatConsumer } from './sources/bus.js';
+import { runHealthCheck } from './sources/health.js';
+import { PrometheusScraper, parsePrometheus } from './sources/prometheus.js';
+import type { Fetch } from './sources/types.js';
+import { Store } from './store.js';
+import { createCtx, type Ctx } from './views/ctx.js';
+
+const TARGETS = [
+  { id: 'nx-control-room', name: 'control-room', project: 'nexusinfra', url: 'http://cr:9000/health' },
+  { id: 'fv-api-gateway', name: 'api-gateway', project: 'finvault', url: 'http://fv:8000/health' },
+  { id: 'fv-invoice-service', name: 'invoice-service', project: 'finvault', url: 'http://fv:8003/health' },
+];
+
+interface Api {
+  get<T>(path: string): Promise<T>;
+  status(path: string, init?: RequestInit): Promise<number>;
+  close(): Promise<void>;
+}
+
+async function serve(ctx: Ctx): Promise<Api> {
+  const server = createApp(ctx).listen(0);
+  await new Promise<void>((r) => server.once('listening', () => r()));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return {
+    async get<T>(path: string) {
+      const res = await fetch(base + path);
+      if (!res.ok) throw new Error(`${path} → ${res.status} ${await res.text()}`);
+      return (await res.json()) as T;
+    },
+    async status(path, init) {
+      return (await fetch(base + path, { ...init, headers: { 'Content-Type': 'application/json' } })).status;
+    },
+    close: () => new Promise((r) => server.close(() => r())),
+  };
+}
+
+/** A collector with live sources, already holding a few minutes of fake history. */
+async function liveCtx(): Promise<Ctx> {
+  let now = Date.now() - 10 * 60_000;
+  const clock = () => now;
+  const config = loadConfig({
+    NW_HEALTH_TARGETS: JSON.stringify(TARGETS),
+    NW_RABBITMQ_URL: 'amqp://fake',
+    NW_METRICS_TARGETS: 'orchestrator=http://or:9200/metrics',
+  });
+  const store = new Store();
+  const fetchFor = (id: string): Fetch => async () => {
+    if (id === 'fv-invoice-service') throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+    now += id === 'fv-api-gateway' ? 140 : 30;
+    return new Response('{"status":"healthy"}');
+  };
+  const bus = new HeartbeatConsumer(store, clock, undefined);
+  const scraper = new PrometheusScraper(store, fetchFor('x'), clock);
+  for (let i = 0; i < 10; i++) {
+    for (const t of config.health.targets) await runHealthCheck(t, store, fetchFor(t.id), clock, { slowMs: 100, failuresForIncident: 3 });
+    const beat = { nodeId: 'node-pi', status: 'healthy', resources: { cpuPercent: 30 + i, ramUsedMb: 2048, ramTotalMb: 8192 } };
+    bus.handle('monitoring.heartbeat.node.node-pi', Buffer.from(JSON.stringify({ eventId: String(i), timestamp: '', source: 'node-agent:node-pi', event: { type: 'heartbeat.node', payload: beat } })));
+    scraper.ingest('orchestrator', parsePrometheus(`nexusinfra_http_requests_total{status="2xx"} ${i * 100}\nnexusinfra_http_requests_total{status="5xx"} ${i}\nnexusinfra_dead_letters 2`), now);
+    now += 60_000;
+  }
+  now = Date.now();
+  // The node's last heartbeat was a minute ago, so by now it counts as offline.
+  return createCtx(store, config, { clock: () => Date.now() });
+}
+
+const modes: [string, () => Promise<Ctx>][] = [
+  ['sample data (no sources)', async () => createCtx(new Store(), loadConfig({}))],
+  ['live sources', liveCtx],
+];
+
+describe.each(modes)('HTTP contract — %s', (_mode, make) => {
+  let api: Api;
+  let live: boolean;
+  beforeAll(async () => {
+    const ctx = await make();
+    live = ctx.live.services;
+    api = await serve(ctx);
+  });
+  afterAll(() => api.close());
+
+  it('counts services consistently in the overview KPIs', async () => {
+    const o = await api.get<C.OverviewData>('/api/overview?range=24h');
+    expect(o.kpis.servicesTotal).toBe(o.services.length);
+    expect(o.kpis.servicesUp + o.kpis.servicesSlow + o.kpis.servicesDown).toBe(o.kpis.servicesTotal);
+    expect(o.events.length).toBeGreaterThan(0);
+  });
+
+  it('gives every service at most 48 beats and a down service a null latency', async () => {
+    const { services } = await api.get<C.OverviewData>('/api/overview?range=24h');
+    expect(services.some((s) => s.status === 'down')).toBe(true);
+    for (const s of services) {
+      if (live) expect(s.beats.length).toBeLessThanOrEqual(48);
+      else expect(s.beats).toHaveLength(48);
+      if (s.status === 'down') expect(s.latencyMs).toBeNull();
+    }
+  });
+
+  it('filters logs by level, project and text', async () => {
+    const errors = await api.get<C.LogsData>('/api/logs?q=&range=24h&level=error&project=finvault');
+    expect(errors.entries.length).toBeGreaterThan(0);
+    expect(errors.entries.every((e) => e.level === 'error' && e.project === 'finvault')).toBe(true);
+    const text = await api.get<C.LogsData>('/api/logs?q=ECONNREFUSED&range=24h');
+    expect(text.entries.length).toBeGreaterThan(0);
+    expect(text.entries.every((e) => e.message.toLowerCase().includes('econnrefused'))).toBe(true);
+  });
+
+  it('links log lines to monitored services with ids that are stable across calls', async () => {
+    const a = await api.get<C.LogsData>('/api/logs?q=healthcheck&range=24h');
+    expect(a.entries[0].serviceId).toBe('fv-invoice-service');
+    const b = await api.get<C.LogsData>('/api/logs?q=healthcheck&range=24h');
+    expect(b.entries.map((e) => e.id)).toEqual(a.entries.map((e) => e.id));
+  });
+
+  it('answers 404 for an unknown service and a detail for a known one', async () => {
+    expect(await api.status('/api/services/nope')).toBe(404);
+    const d = await api.get<C.ServiceDetail>('/api/services/fv-invoice-service');
+    expect(d.downSince).not.toBeNull();
+    expect(d.service.latencyMs).toBeNull();
+    if (live) expect(d.checks.length).toBeLessThanOrEqual(120);
+    else expect(d.checks).toHaveLength(120);
+  });
+
+  it('persists rule toggles and acknowledgements', async () => {
+    expect(await api.status('/api/alert-rules/r8', { method: 'PATCH', body: JSON.stringify({ enabled: true }) })).toBe(204);
+    expect(await api.status('/api/alert-rules/nope', { method: 'PATCH', body: JSON.stringify({ enabled: true }) })).toBe(404);
+    expect(await api.status('/api/alert-rules/r8', { method: 'PATCH', body: JSON.stringify({ enabled: 'yes' }) })).toBe(400);
+    const before = await api.get<C.AlertsData>('/api/alerts');
+    expect(before.active.length).toBeGreaterThan(0);
+    const id = before.active[0].id;
+    expect(await api.status(`/api/alerts/${id}/ack`, { method: 'POST' })).toBe(204);
+    const a = await api.get<C.AlertsData>('/api/alerts');
+    expect(a.rules.find((r) => r.id === 'r8')?.enabled).toBe(true);
+    expect(a.active.find((x) => x.id === id)?.acknowledged).toBe(true);
+    expect((await api.get<C.NavCounts>('/api/nav')).openAlerts).toBe(a.active.length);
+  });
+
+  it('routes every severity to every configured channel, Telegram included', async () => {
+    const s = await api.get<C.SettingsData>('/api/settings');
+    const ids = s.channels.map((c) => c.id);
+    expect(ids).toContain('telegram');
+    for (const severity of ['critical', 'warning', 'info'] as const) {
+      expect(Object.keys(s.routing[severity]).sort()).toEqual([...ids].sort());
+    }
+  });
+
+  it('stores retention changes and rejects values that are not offered', async () => {
+    const s = await api.get<C.SettingsData>('/api/settings');
+    const retention = s.retention.map((r) => (r.id === 'logs' ? { ...r, current: '30d' } : r));
+    expect(await api.status('/api/settings', { method: 'PATCH', body: JSON.stringify({ retention }) })).toBe(204);
+    expect((await api.get<C.SettingsData>('/api/settings')).retention.find((r) => r.id === 'logs')?.current).toBe('30d');
+    const bad = s.retention.map((r) => (r.id === 'logs' ? { ...r, current: 'forever' } : r));
+    expect(await api.status('/api/settings', { method: 'PATCH', body: JSON.stringify({ retention: bad }) })).toBe(400);
+  });
+
+  it('returns a series per configured line for every metric, never padded', async () => {
+    for (const id of ['cpu', 'memory', 'disk', 'network', 'queues']) {
+      const m = await api.get<C.MetricData>(`/api/metrics/${id}?range=24h`);
+      expect(m.id).toBe(id);
+      // Live: a metric nobody measured (the fake agent reports no disk) has no series, not zeros.
+      if (live && id === 'disk') expect(m.series).toEqual([]);
+      else expect(m.series.length).toBeGreaterThan(0);
+      for (const s of m.series) {
+        expect(s.values.length).toBeGreaterThan(0);
+        expect(s.values.length).toBeLessThanOrEqual(90);
+        if (!live || id === 'network') expect(s.values).toHaveLength(90);
+      }
+    }
+    expect(await api.status('/api/metrics/nope')).toBe(404);
+    expect(await api.status('/api/metrics/cpu?range=2h')).toBe(400);
+  });
+
+  it('serves every read endpoint of docs/api.md', async () => {
+    for (const path of ['/api/host', '/api/nav', '/api/metrics?range=24h', '/api/heartbeats', '/api/projects/nexusinfra', '/api/projects/finvault']) {
+      await expect(api.get(path)).resolves.toBeTruthy();
+    }
+    const h = await api.get<C.CollectorHealth>('/health');
+    expect(h.version).toBeTruthy();
+    expect(await api.get<C.CollectorHealth>('/api/health')).toMatchObject({ live: h.live });
+    expect(await api.status('/api/nothing-here')).toBe(404);
+  });
+});
+
+describe('HTTP contract — live specifics', () => {
+  let api: Api;
+  beforeAll(async () => (api = await serve(await liveCtx())));
+  afterAll(() => api.close());
+
+  it('reports live parts and real nodes', async () => {
+    const h = await api.get<C.CollectorHealth>('/health');
+    expect(h.live).toMatchObject({ services: true, nodes: true, nodeMetrics: true, requests: true, logs: true });
+    const hb = await api.get<C.HeartbeatsData>('/api/heartbeats');
+    expect(hb.nodes.map((n) => n.id)).toEqual(['node-pi']);
+    expect(hb.nodes[0].status).toBe('down');
+    expect(hb.nodes[0].gauges.map((g) => g.label)).toEqual(['CPU', 'Memory']);
+    expect(hb.monitors.map((m) => m.serviceId)).toEqual(TARGETS.map((t) => t.id));
+    expect(hb.incidents.some((i) => i.open && i.title === 'invoice-service is not responding')).toBe(true);
+  });
+
+  it('marks a slow answer slow and leaves unmeasured FinVault rates null', async () => {
+    const fv = await api.get<C.FinVaultData>('/api/projects/finvault');
+    expect(fv.services.map((s) => s.service.id)).toEqual(['fv-api-gateway', 'fv-invoice-service']);
+    expect(fv.services[0].service.status).toBe('slow');
+    expect(fv.services[1].p95).toBe('timeout');
+    expect(fv.services.every((s) => s.rps === null && s.errorPct === null)).toBe(true);
+  });
+
+  it('draws request rates and dead letters from the scrape', async () => {
+    const o = await api.get<C.OverviewData>('/api/overview?range=1h');
+    expect(o.requests.rps.length).toBeGreaterThan(0);
+    expect(Math.max(...o.requests.rps)).toBeCloseTo(100 / 60, 1);
+    const q = await api.get<C.MetricData>('/api/metrics/queues?range=1h');
+    expect(q.series.map((s) => s.name)).toEqual(['dead-letters']);
+  });
+});

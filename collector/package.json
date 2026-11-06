@@ -1,0 +1,28 @@
+{
+  "name": "collector",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "NexusWatch backend: gathers heartbeats, metrics and logs, stores them and serves the /api contract.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=../.env --import tsx --watch src/index.ts",
+    "start": "node --env-file-if-exists=../.env --import tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "express": "^5.1.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/express": "^5.0.0",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12"
+  }
+}
