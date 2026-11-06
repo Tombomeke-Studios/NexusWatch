@@ -113,12 +113,12 @@ export function BarChart({ values, color, height = 120, label }: { values: numbe
   );
 }
 
-/** Row of status cells (heartbeats, checks, days). */
-export function StatusStrip({ statuses, height = 22, gap = 2, radius = 2 }: { statuses: HealthStatus[]; height?: number; gap?: number; radius?: number }) {
+/** Row of status cells (heartbeats, checks, days). `null` is a cell without data — drawn empty, never as up. */
+export function StatusStrip({ statuses, height = 22, gap = 2, radius = 2 }: { statuses: readonly (HealthStatus | null)[]; height?: number; gap?: number; radius?: number }) {
   return (
     <div className="strip" aria-hidden="true" style={{ height, gap }}>
       {statuses.map((s, i) => (
-        <span key={i} style={{ background: statusColor[s], borderRadius: radius }} />
+        <span key={i} style={{ background: s ? statusColor[s] : 'var(--border)', borderRadius: radius }} />
       ))}
     </div>
   );
