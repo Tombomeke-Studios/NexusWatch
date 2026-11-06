@@ -3,36 +3,63 @@
 Monitoring dashboard for NexusInfra and FinVault: heartbeats, logs, metrics, alerts and the
 business flow between the two platforms, in one place.
 
-> **Status:** concept, not yet approved. The dashboard runs entirely on built-in sample data;
-> there is no backend yet. See [TODO.md](TODO.md).
+> **Status:** concept, not yet approved. The dashboard talks to the `collector` backend, which serves
+> real data from every source you configure and built-in sample data for everything else.
+> See [TODO.md](TODO.md).
 
 ## Run it
 
-Requires Node.js 20+.
+Requires Node.js 22.13+ (the collector uses Node's built-in SQLite).
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173.
+Open http://localhost:5173. This starts the collector on http://localhost:8080 and the dashboard
+in front of it. With no configuration every endpoint answers with sample data; copy `.env.example`
+to `.env` and set the `NW_*` variables to watch a real NexusInfra / FinVault stack.
+`npm run dev:mocks` runs the dashboard alone on its built-in sample data.
+
+With Docker: `docker compose up --build`, then http://localhost:8088.
 
 ## Scripts (repo root)
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Dashboard dev server with hot reload |
-| `npm run build` | Typecheck + production build into `dashboard/dist` |
-| `npm test` | Unit and page tests (Vitest) |
+| `npm run dev` | Collector + dashboard with hot reload |
+| `npm run dev:mocks` | Dashboard alone on sample data |
+| `npm run dev:collector` | Collector alone |
+| `npm run build` | Typecheck + production build into `dashboard/dist`, collector typecheck |
+| `npm test` | Unit, page and contract tests (Vitest, both workspaces) |
 | `npm run lint` | ESLint over the whole repo |
 
 ## Configuration
+
+### Collector
+
+`.env` in the repo root (copy from [`.env.example`](.env.example)). The variables that point it at a
+real stack:
+
+| Variable | Example | Turns on |
+|---|---|---|
+| `NW_HEALTH_TARGETS` / `NW_HEALTH_TARGETS_FILE` | see `collector/targets.example.json` | Heartbeat checker for every `/health` |
+| `NW_CONTROL_ROOM_URL` | `http://localhost:9000` | NexusInfra Control Room `/status` + `/uptime` (nodes, heartbeat sources) |
+| `NW_METRICS_TARGETS` | `orchestrator=http://localhost:9200/metrics,…` | Prometheus scrape (requests, 5xx, p95, queues) |
+| `NW_METRICS_TOKEN` | NexusInfra's `METRICS_TOKEN` | Bearer token for protected `/metrics` |
+| `NW_RABBITMQ_URL` | `amqp://guest:guest@localhost:5672` | Heartbeats on `finvault.events` (node CPU / memory / disk) |
+| `FINVAULT_MESSAGE_KEY` | the key both platforms share | Reading encrypted payloads |
+
+Also `NW_PORT` (8080), `NW_DB_PATH`, intervals, timeouts and thresholds, all listed in `.env.example`.
+`GET http://localhost:8080/health` shows which parts are live and each source's last error.
+
+### Dashboard
 
 `dashboard/.env` (copy from `dashboard/.env.example`):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `VITE_USE_MOCKS` | `true` | Serve sample data instead of calling the API |
+| `VITE_USE_MOCKS` | `true` (`npm run dev` sets `false`) | Serve sample data instead of calling the API |
 | `VITE_API_BASE` | `/api` | Base URL of the NexusWatch API |
 | `VITE_REFRESH_MS` | `10000` | Polling interval for live views |
 | `NW_API_TARGET` (shell env) | `http://localhost:8080` | Where the dev server proxies `/api` |
