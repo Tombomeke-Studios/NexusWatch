@@ -99,6 +99,11 @@ served: a part with a configured source is answered from stored data ("live"), e
 the dashboard's own sample generators, so the API is complete from the first start. `GET /health`
 lists which parts are live.
 
+Business, SLOs, incidents, `/status` and the alerting writes (rules, silences, maintenance windows,
+escalation policies, resolving an alert) have no live source yet: the collector answers them from the
+sample generators, and their state lives in memory until a restart. Errors keep the statuses in the
+tables above (404 unknown, 409 already resolved, 400 invalid input).
+
 Rules the live answers follow, beyond the shapes:
 
 - **Series are never padded.** A live series starts at its first measurement in the window and is

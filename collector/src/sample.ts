@@ -4,3 +4,4 @@
  * what the dashboard shows with VITE_USE_MOCKS=true.
  */
 export * as sample from '../../dashboard/src/api/mock/data.js';
+export * as reliability from '../../dashboard/src/api/mock/reliability.js';

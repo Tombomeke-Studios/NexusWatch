@@ -180,13 +180,37 @@ describe.each(modes)('HTTP contract — %s', (_mode, make) => {
   });
 
   it('serves every read endpoint of docs/api.md', async () => {
-    for (const path of ['/api/host', '/api/nav', '/api/metrics?range=24h', '/api/heartbeats', '/api/projects/nexusinfra', '/api/projects/finvault']) {
+    for (const path of [
+      '/api/host', '/api/nav', '/api/metrics?range=24h', '/api/heartbeats', '/api/projects/nexusinfra', '/api/projects/finvault',
+      '/api/business', '/api/slos', '/api/incidents', '/api/status',
+    ]) {
       await expect(api.get(path)).resolves.toBeTruthy();
     }
     const h = await api.get<C.CollectorHealth>('/health');
     expect(h.version).toBeTruthy();
     expect(await api.get<C.CollectorHealth>('/api/health')).toMatchObject({ live: h.live });
     expect(await api.status('/api/nothing-here')).toBe(404);
+  });
+
+  it('serves the incident lifecycle and answers 404/409 like the mocks', async () => {
+    const body = (b: unknown, method = 'POST'): RequestInit => ({ method, body: JSON.stringify(b) });
+    const { incidents } = await api.get<C.IncidentsData>('/api/incidents');
+    expect(incidents.length).toBeGreaterThan(0);
+    expect(await api.get<C.IncidentDetail>(`/api/incidents/${incidents[0].id}`)).toMatchObject({ id: incidents[0].id });
+    expect(await api.status('/api/incidents/nope')).toBe(404);
+    const resolved = incidents.find((i) => i.status === 'resolved');
+    if (resolved) expect(await api.status(`/api/incidents/${resolved.id}/updates`, body({ status: 'monitoring', message: 'x', public: false }))).toBe(409);
+    expect(await api.status('/api/incidents', body({ title: 'Test', severity: 'warning', serviceIds: ['fv-invoice-service'], message: 'Looking', public: false }))).toBe(200);
+  });
+
+  it('serves alert-rule, silence, maintenance and escalation writes', async () => {
+    const init = (method: string, b?: unknown): RequestInit => ({ method, ...(b === undefined ? {} : { body: JSON.stringify(b) }) });
+    expect(await api.status('/api/alert-rules/nope', init('DELETE'))).toBe(404);
+    // Removing a silence, window or policy that is already gone is not an error (idempotent, as in the mocks).
+    expect(await api.status('/api/silences/nope', init('DELETE'))).toBe(204);
+    expect(await api.status('/api/maintenance-windows/nope', init('DELETE'))).toBe(204);
+    expect(await api.status('/api/escalation-policies/nope', init('DELETE'))).toBe(204);
+    expect(await api.status('/api/alert-rules/test', init('POST', { project: 'finvault', condition: { metric: 'queue', comparator: '>', threshold: 25, forSeconds: 300 } }))).not.toBe(404);
   });
 });
 

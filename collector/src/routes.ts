@@ -11,6 +11,7 @@ import { logs } from './views/logs.js';
 import { metric, metricsOverview } from './views/metrics.js';
 import { finVault, heartbeats, host, navCounts, nexusInfra, overview } from './views/pages.js';
 import { serviceDetail } from './views/services.js';
+import { sampledRoutes } from './views/sampled.js';
 import { settings, updateSettings, type SettingsPatch } from './views/settings.js';
 
 /** An answer: JSON body (200), `null` (204), or an HttpError. */
@@ -29,10 +30,12 @@ export interface RouteInput {
   body: unknown;
 }
 
+export type RouteHandler = (ctx: Ctx, input: RouteInput) => unknown;
+
 export interface Route {
-  method: 'GET' | 'POST' | 'PATCH';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
-  handle(ctx: Ctx, input: RouteInput): unknown;
+  handle: RouteHandler;
 }
 
 const VERSION = '0.1.0';
@@ -123,4 +126,6 @@ export const routes: Route[] = [
       return null;
     },
   },
+  // Not fed by a live source yet: answered from the dashboard's sample generators.
+  ...sampledRoutes,
 ];

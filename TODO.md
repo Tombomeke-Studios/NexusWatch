@@ -9,6 +9,7 @@ _(no active branch)_
 ## Backlog
 
 ### Backend (collector follow-ups)
+- [ ] Persist the sample-backed endpoints (incidents, rules, silences, maintenance, escalation) in SQLite, then feed SLOs, `/status` and Business from live sources (#—)
 - [ ] Deliver notifications: Discord webhook, Telegram Bot API `sendMessage`, SMTP, ntfy — and the "Send test" button (#—)
 - [ ] Evaluate alert rules (today every open incident is an active alert; rules are the sample set + stored toggles) (#—)
 - [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
@@ -62,6 +63,11 @@ _(no active branch)_
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
+### `feature/collector-sampled-endpoints` — merged into `dev`
+- [x] Collector serves every endpoint the dashboard calls: business, SLOs, incidents, `/status`, alerting writes (sample-backed) (#—)
+- [x] Reliability mocks return 404/409/400 as documented instead of a bare error (500 through the collector) (#—)
+- [x] Business: the top-up pipeline no longer overflows at 390px in mobile's stacked rows (#—)
+
 ### `feature/mobile` — merged into `dev`
 - [x] Shared nav config (`nav.ts`) for the sidebar and the mobile shell (#—)
 - [x] Mobile shell below 820px: top bar (logo, title, alert badge) + bottom tab bar with a "More" sheet (#—)
