@@ -12,6 +12,7 @@ import type {
   Maintenance, NewIncident, NewIncidentUpdate, ProjectId, PublicIncident, PublicStatus, ResolveIncident, Slo, SloData, StatusComponent,
   StatusPageData,
 } from '../types';
+import { ApiError } from '../client';
 import { services } from './data';
 
 const MIN = 60;
@@ -228,14 +229,14 @@ export function incidentSummaries(): Incident[] {
 
 function find(id: string): StoredIncident {
   const s = incidentStore.find((i) => i.id === id);
-  if (!s) throw new Error(`Incident ${id} not found`);
+  if (!s) throw new ApiError(404, `Incident ${id} not found`);
   return s;
 }
 
 export function createIncident(input: NewIncident): IncidentDetail {
   const title = input.title.trim();
-  if (!title) throw new Error('An incident needs a title');
-  if (input.serviceIds.length === 0) throw new Error('Pick at least one affected service');
+  if (!title) throw new ApiError(400, 'An incident needs a title');
+  if (input.serviceIds.length === 0) throw new ApiError(400, 'Pick at least one affected service');
   const id = `inc_${incidentStore.reduce((max, i) => Math.max(max, Number(i.id.slice(4)) || 0), 0) + 1}`;
   const message = input.message.trim() || 'We are investigating.';
   const stored: StoredIncident = {
@@ -251,8 +252,8 @@ export function createIncident(input: NewIncident): IncidentDetail {
 
 export function postIncidentUpdate(id: string, input: NewIncidentUpdate): IncidentDetail {
   const s = find(id);
-  if (s.status === 'resolved') throw new Error('This incident is already resolved');
-  if (!input.message.trim()) throw new Error('An update needs a message');
+  if (s.status === 'resolved') throw new ApiError(409, 'This incident is already resolved');
+  if (!input.message.trim()) throw new ApiError(400, 'An update needs a message');
   s.status = input.status;
   s.updates.unshift(upd(0, input.status, input.message.trim(), input.public));
   return toDetail(s);
@@ -260,7 +261,7 @@ export function postIncidentUpdate(id: string, input: NewIncidentUpdate): Incide
 
 export function resolveIncident(id: string, input: ResolveIncident): IncidentDetail {
   const s = find(id);
-  if (s.status === 'resolved') throw new Error('This incident is already resolved');
+  if (s.status === 'resolved') throw new ApiError(409, 'This incident is already resolved');
   s.status = 'resolved';
   s.resolvedAt = ago(0);
   s.updates.unshift(upd(0, 'resolved', input.message.trim() || 'This incident has been resolved.', input.public));
