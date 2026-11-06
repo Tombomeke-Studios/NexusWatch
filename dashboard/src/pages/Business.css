@@ -34,3 +34,10 @@
 /* 60 per-minute bars must fit a phone-width card: the default 4px gap and 3px minimum do not. */
 .biz-dense .bars { gap: 1px; }
 .biz-dense .bars span { min-width: 1px; }
+
+/* Narrow screens: in the stacked card rows the pipeline gets the full row and its steps share it. */
+@media (max-width: 820px) {
+  .tbl .tr > :has(> .biz-steps) { grid-column: 1 / -1; }
+  .biz-steps { width: 100%; }
+  .biz-step { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+}
