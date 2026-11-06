@@ -77,6 +77,10 @@ Also `NW_PORT` (8080), `NW_DB_PATH`, intervals, timeouts and thresholds, all lis
 | `/projects/nexusinfra` | Nodes, containers, platform components, payments |
 | `/projects/finvault` | Top-up funnel, services, queues, transactions, security |
 | `/settings` | Agents, notification channels and routing, retention, storage, theme |
+| `/slo` | SLOs and error budgets: attainment, budget left, burn rate 1h/6h/24h, multi-window burn alerts, burn-down |
+| `/incidents` | Open and resolved incidents; declare a new one |
+| `/incidents/:id` | Lifecycle, update timeline, affected services, post update, resolve, postmortem |
+| `/status` | Public status page (no sidebar, shareable): overall banner, 90-day uptime per component, incidents, maintenance |
 
 ## Phones and tablets
 

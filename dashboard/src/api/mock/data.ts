@@ -5,10 +5,11 @@
 import { rng, walk } from '@/lib/series';
 import type {
   ActiveAlert, Agent, AlertHistoryItem, AlertRule, AlertsData, Channel, ContainerRow, ContainerUsage,
-  FinVaultData, HealthStatus, HeartbeatsData, HostInfo, Incident, LogEntry, LogLevel, LogQuery, LogsData,
+  FinVaultData, HealthStatus, HeartbeatsData, HostInfo, LogEntry, LogLevel, LogQuery, LogsData,
   MetricData, MetricId, MetricsOverview, Monitor, NavCounts, NexusInfraData, NodeSummary, OverviewData,
   ProjectId, ServiceDetail, ServiceSummary, SettingsData,
 } from '../types';
+import { incidentSummaries } from './reliability';
 
 const MIN = 60;
 const HOUR = 3600;
@@ -224,13 +225,6 @@ function monitor(serviceId: string, target: string, seed: number, down: number[]
   return { id: `mon_${serviceId}`, serviceId, name: s.name, project: s.project, target, uptimePct: s.uptimePct, status: s.status, avgLatencyMs, nowLatencyMs: s.latencyMs, days: days(seed, down, warn) };
 }
 
-const incidents: Incident[] = [
-  { id: 'inc_4', open: true, severity: 'critical', title: 'invoice-service is not responding', note: 'Health check returns ECONNREFUSED on :8003. Queue invoice.events is growing.', startedAt: ago(16 * MIN), durationSeconds: 16 * MIN },
-  { id: 'inc_3', open: true, severity: 'warning', title: 'node-02 is slow', note: 'CPU 78% and memory 82%; heartbeat above the 100 ms threshold.', startedAt: ago(32 * MIN), durationSeconds: 32 * MIN },
-  { id: 'inc_2', open: false, severity: 'critical', title: 'node-agent · node-02 offline', note: 'VM rebooted after a host update; the agent reconnected on its own.', startedAt: ago(37 * DAY), durationSeconds: 8 * MIN },
-  { id: 'inc_1', open: false, severity: 'critical', title: 'invoice-service crash loop', note: 'A database migration was missing; fixed with a redeploy.', startedAt: ago(62 * DAY), durationSeconds: 41 * MIN },
-];
-
 export function heartbeats(): HeartbeatsData {
   return {
     nodes,
@@ -242,7 +236,7 @@ export function heartbeats(): HeartbeatsData {
       monitor('fv-wallet-service', 'http://finvault:8002/health', 5, [], [19, 20], 56),
       monitor('fv-invoice-service', 'http://finvault:8003/health', 6, [27, 59], [26], 51),
     ],
-    incidents,
+    incidents: incidentSummaries(),
   };
 }
 

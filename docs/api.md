@@ -68,3 +68,38 @@ Rules the live answers follow, beyond the shapes:
   list and toggles are stored but the rules themselves are the sample set.
 - Writes are stored in SQLite and survive restarts. `PATCH /settings` answers 400 when a retention
   value is not one of that kind's `options`.
+
+## Reliability: SLOs, incidents, public status
+
+| Method & path | Body | Response type | Used by |
+|---|---|---|---|
+| `GET /slos` | | `SloData` | SLOs, Service detail SLO card |
+| `GET /incidents` | | `IncidentsData` (open first, then newest first) | Incidents |
+| `GET /incidents/:id` | | `IncidentDetail` (404 when unknown) | Incident detail |
+| `POST /incidents` | `NewIncident` | `IncidentDetail` (status `investigating`) | Declare incident |
+| `POST /incidents/:id/updates` | `NewIncidentUpdate` | `IncidentDetail` | Post update (409 once resolved) |
+| `POST /incidents/:id/resolve` | `ResolveIncident` | `IncidentDetail` | Resolve, optionally with a postmortem (409 once resolved) |
+| `GET /status` | | `StatusPageData` | Public status page |
+
+**SLOs.** The backend sends raw check tallies — per day of the rolling window and per burn window
+(`5m`, `30m`, `1h`, `2h`, `6h`, `24h`) — and the dashboard derives attainment, budget, burn rate and
+time to exhaustion in `lib/slo.ts`, so the maths lives in one tested place. A check is `good` when the
+service answered (up or slow: this is an availability objective), `bad` when it failed and `unknown`
+when there is no data (agent offline, collector gap). Unknown checks are left out of every
+calculation; they are never counted as up or as down. `daily` has `windowDays` entries, oldest first,
+and sums to `window`. Burn alerts follow the Google SRE multi-window rule: 2% of the budget in 1 h
+(confirmed over 5 min), 5% in 6 h (30 min), 10% in 24 h (2 h).
+
+**Incidents.** Lifecycle `investigating → identified → monitoring → resolved`; every update carries
+the status it moved to, so `updates[0].status` is the current status. `resolvedAt` is null until
+resolved. `durationSeconds` runs until now while open. Heartbeats' incident list (`HeartbeatsData.incidents`)
+is a summary of the same incidents, with the same ids.
+
+**Public status (`GET /status`).** The only endpoint meant to be served without authentication.
+`StatusPageData` is its own set of types on purpose: it carries no hosts, addresses, ports, check
+targets, node names, internal service ids or update authors — a test walks the type and the response
+to enforce that. Components have a public `slug` and name and may group several services
+(the worst status wins). Only incidents with `public: true` appear, under their `publicTitle`, with
+only their public updates. `days` holds 90 entries, oldest first; `null` is a day without data and is
+drawn as "no data", never as up. `recent` holds public incidents resolved in the last 14 days;
+`maintenance` holds windows that have not ended yet.

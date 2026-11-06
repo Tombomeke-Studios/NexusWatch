@@ -56,6 +56,19 @@ const PATHS = {
     </>
   ),
   filter: <path d="M3 5h18M6 12h12M10 19h4" />,
+  slo: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1" />
+    </>
+  ),
+  incident: (
+    <>
+      <path d="M4 22V4" />
+      <path d="M4 4h12l-2 4 2 4H4" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useService } from '@/api/queries';
 import type { LogEntry, ServiceDetail } from '@/api/types';
 import { LogDocument } from '@/components/LogDocument';
+import { SloCard } from '@/components/SloCard';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { LineChart, StatusStrip } from '@/components/ui/charts';
 import { Kpi, PageHeader, Pill, StatusDot, Swatch } from '@/components/ui/primitives';
@@ -102,6 +103,8 @@ function ServiceBody({ data }: { data: ServiceDetail }) {
         <Kpi label="Last check" value={formatClock(kpis.lastCheckAt)} valueStyle={{ fontSize: 24, fontWeight: 500, fontFamily: "'JetBrains Mono', monospace" }} foot={kpis.lastCheckNote} />
         <Kpi label="Restarts (24h)" value={kpis.restarts24h} valueColor={kpis.restarts24h > 2 ? 'var(--warn)' : undefined} foot={kpis.restarts24h > 2 ? 'crash loop suspected' : 'stable'} />
       </section>
+
+      <SloCard serviceId={service.id} />
 
       <Card padded labelledBy="rt">
         <CardHeader flat id="rt" title="Response time" hint="last 24 hours, per check" />

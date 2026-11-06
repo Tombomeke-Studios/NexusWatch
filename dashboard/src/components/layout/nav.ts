@@ -33,6 +33,8 @@ export const NAV: NavItem[] = [
   { to: routes.logs, label: 'Logs', icon: 'logs', group: 'main', tab: true },
   { to: routes.metrics, label: 'Metrics', icon: 'metrics', group: 'main' },
   { to: routes.alerts, label: 'Alerts', icon: 'alerts', group: 'main', tab: true, badge: 'alerts' },
+  { to: routes.slo, label: 'SLOs', icon: 'slo', group: 'main' },
+  { to: routes.incidents, label: 'Incidents', icon: 'incident', group: 'main' },
   { to: routes.project('nexusinfra'), label: 'NexusInfra', swatch: 'var(--c-nx)', group: 'projects', count: 'nexusinfra' },
   { to: routes.project('finvault'), label: 'FinVault', swatch: 'var(--c-fv)', group: 'projects', count: 'finvault' },
   { to: routes.settings, label: 'Settings', icon: 'settings', group: 'system' },
@@ -59,5 +61,6 @@ export function titleFor(pathname: string, items: NavItem[] = NAV): string {
   const hit = items.find((i) => isNavActive(i, pathname));
   if (hit) return hit.label;
   if (matchPath('/services/:serviceId', pathname)) return 'Service';
+  if (matchPath('/incidents/:id', pathname)) return 'Incident';
   return 'NexusWatch';
 }

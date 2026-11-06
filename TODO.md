@@ -28,6 +28,17 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [x] `FinVaultService.rps` nullable (unmeasured is not 0) (#—)
 - [x] Docs: architecture, api (`/health`, live rules), CLAUDE.md, README (#—)
 
+### `feature/status-slo` — local, not merged
+- [x] SLO maths in `lib/slo.ts`: budget, burn rate, time to exhaustion, burn-down, multi-window burn alerts; unknown checks excluded (#—)
+- [x] `/slo` page: per-service target, attainment, budget left, burn 1h/6h/24h, burn alerts, burn-down chart (#—)
+- [x] SLO card on Service detail (#—)
+- [x] Incidents: `/incidents` + `/incidents/:id` with lifecycle, update timeline, affected services, duration, postmortem (#—)
+- [x] Mock mutations: declare incident, post update, resolve (with postmortem) (#—)
+- [x] Heartbeats' incident list links to the incident pages (same store) (#—)
+- [x] Public `/status` page outside the shell: banner, component groups with 90-day bars, active + recent incidents, maintenance (#—)
+- [x] `StatusPageData` public-safe types + test that no host/port/IP/id leaks (#—)
+- [x] Contract (types, endpoints, hooks, mocks, docs/api.md), route tests, mock contract tests (#—)
+
 ## Backlog
 
 ### Backend (collector follow-ups)
@@ -43,6 +54,16 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] Build and run the Docker images end to end (compose validated, images not built yet: Docker daemon was off) (#—)
 - [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
 - [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
+
+### Reliability (follow-ups from `feature/status-slo`)
+- [ ] Backend: compute SLO tallies per day and per burn window from stored checks; `unknown` for gaps (#—)
+- [ ] Backend: deliver SLO burn alerts through the notification routing (page = critical, ticket = warning) (#—)
+- [ ] Define SLOs in Settings (target, window, objective) instead of one per service — "+ New SLO" is "Coming soon" (#—)
+- [ ] Latency SLOs (e.g. p95 < 300 ms) next to availability (#—)
+- [ ] Incidents: edit postmortem and tick action items after resolving; link alerts to the incident they opened (#—)
+- [ ] Maintenance windows: create/edit in the dashboard, and mute alerts during them (#—)
+- [ ] Serve `/status` from a separate, unauthenticated origin once authentication lands; cache it (#—)
+- [ ] Service detail at 390 px: the 120-check strip (3 px gap) is ~600 px wide and scrolls the page sideways — existed before this branch (#—)
 
 ### Dashboard
 - [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)

@@ -27,6 +27,9 @@ describe('routing', () => {
     ['/projects/nexusinfra', 'NexusInfra'],
     ['/projects/finvault', 'FinVault'],
     ['/settings', 'Settings'],
+    ['/slo', 'SLOs'],
+    ['/incidents', 'Incidents'],
+    ['/status', 'Service status'],
     ['/nope', 'Page not found'],
   ])('%s renders the "%s" page heading', async (path, heading) => {
     renderAt(path);
@@ -60,6 +63,47 @@ describe('routing', () => {
     renderAt('/logs?q=prisma');
     expect(await screen.findByDisplayValue('prisma')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /Prisma P1001/, pressed: true })).toBeInTheDocument();
+  });
+
+  it('renders an incident with its lifecycle, updates and postmortem', async () => {
+    renderAt('/incidents/inc_5');
+    expect(await screen.findByRole('heading', { level: 1, name: 'invoice-service returns 5xx' })).toBeInTheDocument();
+    expect(screen.getByText('Resolved', { selector: '.steps li' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByText(/Migration 0042 made the IBAN column required/)).toBeInTheDocument();
+  });
+
+  it('links every Heartbeats incident to its page', async () => {
+    renderAt('/heartbeats');
+    const link = await screen.findByRole('link', { name: /invoice-service crash loop/ });
+    expect(link).toHaveAttribute('href', '/incidents/inc_1');
+  });
+
+  it('shows the SLO card on Service detail', async () => {
+    renderAt('/services/fv-invoice-service');
+    expect(await screen.findByRole('heading', { level: 2, name: /SLO\s*breached/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Burn-down →' })).toHaveAttribute('href', '/slo?service=fv-invoice-service');
+  });
+
+  it('declares an incident and opens it', async () => {
+    renderAt('/incidents');
+    fireEvent.click(await screen.findByRole('button', { name: '+ Declare incident' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Queue wallet.events stuck' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'rabbitmq' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Declare incident' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Queue wallet.events stuck' })).toBeInTheDocument();
+    expect(screen.getByText('Investigating', { selector: '.steps li' })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('renders the public status page without the app shell', async () => {
+    renderAt('/status');
+    expect(await screen.findByText('Some systems are down')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument();
+    expect(screen.getByText('Invoices unavailable')).toBeInTheDocument();
+  });
+
+  it('shows "Nothing here" for an unknown incident', async () => {
+    renderAt('/incidents/nope');
+    expect(await screen.findByText('Nothing here')).toBeInTheDocument();
   });
 
   it('shows "Nothing here" for an unknown service', async () => {

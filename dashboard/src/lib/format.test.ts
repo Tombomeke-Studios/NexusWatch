@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatDuration, formatEur, formatLatency, formatPercent, formatSignedEur, formatWhen } from './format';
+import { formatBudgetMinutes, formatBurn, formatBytes, formatDuration, formatEur, formatExhaustion, formatLatency, formatPercent, formatSignedEur, formatWhen } from './format';
 
 describe('format', () => {
   it('formats euros', () => {
@@ -37,5 +37,29 @@ describe('format', () => {
     expect(formatWhen(new Date(2026, 10, 5, 11, 8).toISOString(), now)).toBe('today 11:08');
     expect(formatWhen(new Date(2026, 10, 4, 22, 10).toISOString(), now)).toBe('yesterday 22:10');
     expect(formatWhen(new Date(2026, 8, 4, 21, 40).toISOString(), now)).toBe('4 Sep 21:40');
+  });
+});
+
+describe('reliability formatting', () => {
+  it('formats burn rates, with "no data" for unknown', () => {
+    expect(formatBurn(14.4)).toBe('14.4×');
+    expect(formatBurn(266.67)).toBe('267×');
+    expect(formatBurn(3.47)).toBe('3.5×');
+    expect(formatBurn(0)).toBe('0×');
+    expect(formatBurn(null)).toBe('no data');
+  });
+
+  it('formats budget minutes signed when overspent', () => {
+    expect(formatBudgetMinutes(21.6)).toBe('21.6 min');
+    expect(formatBudgetMinutes(-33.04)).toBe('-33 min');
+    expect(formatBudgetMinutes(216)).toBe('3h 36m');
+    expect(formatBudgetMinutes(null)).toBe('no data');
+  });
+
+  it('formats time to exhaustion', () => {
+    expect(formatExhaustion(Infinity)).toBe('never');
+    expect(formatExhaustion(0)).toBe('exhausted');
+    expect(formatExhaustion(864)).toBe('14h 24m');
+    expect(formatExhaustion(null)).toBe('no data');
   });
 });
