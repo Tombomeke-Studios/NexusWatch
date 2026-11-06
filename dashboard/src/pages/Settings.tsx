@@ -67,9 +67,9 @@ function Agents({ data }: { data: SettingsData }) {
                 {a.name}
                 <span className="mono subtle" style={{ fontWeight: 400, fontSize: 12, display: 'block' }}>{a.host}</span>
               </span>
-              <span className="mono muted" style={{ flex: '2 1 200px', fontSize: 12.5 }}>nw_agent_••••••••{a.tokenHint}</span>
-              <span className="mono muted" style={{ flex: '1 1 80px' }}>{a.version}</span>
-              <span className="mono muted" style={{ flex: '1 1 110px' }}>{a.lastSeenSeconds} s ago</span>
+              <span className="mono muted" data-label="Token" style={{ flex: '2 1 200px', fontSize: 12.5 }}>nw_agent_••••••••{a.tokenHint}</span>
+              <span className="mono muted" data-label="Version" style={{ flex: '1 1 80px' }}>{a.version}</span>
+              <span className="mono muted" data-label="Last seen" style={{ flex: '1 1 110px' }}>{a.lastSeenSeconds} s ago</span>
               <span style={{ flex: '1 1 90px' }}><Pill tone={statusPill[a.status]}>{statusLabel[a.status]}</Pill></span>
               <span className="r" style={{ flex: '0 0 80px' }}>
                 <button type="button" className="btn sm" disabled title="Coming soon">Rotate</button>
@@ -135,7 +135,7 @@ function Notifications({ data }: { data: SettingsData }) {
               {CHANNEL_COLUMNS.map((ch) => {
                 const on = data.routing[sev][ch.id];
                 return (
-                  <span key={ch.id} style={{ flex: '1 1 90px', display: 'flex', justifyContent: 'center' }}>
+                  <span key={ch.id} data-label={ch.label} style={{ flex: '1 1 90px', display: 'flex', justifyContent: 'center' }}>
                     <button
                       type="button"
                       className={`chk${on ? ' on' : ''}`}

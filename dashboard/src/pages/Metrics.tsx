@@ -82,16 +82,16 @@ export function MetricsPage() {
                 {data.topContainers.map((c) => (
                   <div key={c.name} className="tr">
                     <span className="mono" style={{ flex: '2 1 200px', fontWeight: 500 }}>{c.name}</span>
-                    <span className="muted" style={{ flex: '1 1 100px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="muted" data-label="Project" style={{ flex: '1 1 100px', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Swatch color={projectColor[c.project]} />
                       {projectName[c.project]}
                     </span>
-                    <span className="mono muted" style={{ flex: '1 1 80px' }}>{c.node}</span>
-                    <span style={{ flex: '2 1 200px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className="mono muted" data-label="Node" style={{ flex: '1 1 80px' }}>{c.node}</span>
+                    <span data-label="CPU" style={{ flex: '2 1 200px', display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Meter pct={c.cpuPct} color={c.cpuPct > 70 ? 'var(--c-warn)' : projectColor[c.project]} style={{ flex: 1 }} />
                       <span className="mono r" style={{ width: 44 }}>{c.cpuPct}%</span>
                     </span>
-                    <span className="mono muted r" style={{ flex: '1 1 90px' }}>{formatBytes(c.memoryBytes)}</span>
+                    <span className="mono muted r" data-label="Memory" style={{ flex: '1 1 90px' }}>{formatBytes(c.memoryBytes)}</span>
                   </div>
                 ))}
               </div>
@@ -139,9 +139,9 @@ function MetricChart({ data, range }: { data: MetricData; range: TimeRange }) {
                   {s.name}
                 </span>
                 {[st.min, st.avg, st.p95, st.max].map((v, i) => (
-                  <span key={i} className="muted r" style={{ flex: '1 1 80px' }}>{fmt(v)}</span>
+                  <span key={i} className="muted r" data-label={['Min', 'Avg', 'p95', 'Max'][i]} style={{ flex: '1 1 80px' }}>{fmt(v)}</span>
                 ))}
-                <span className="r" style={{ flex: '1 1 80px', fontWeight: 500 }}>{fmt(st.last)}</span>
+                <span className="r" data-label="Last" style={{ flex: '1 1 80px', fontWeight: 500 }}>{fmt(st.last)}</span>
               </div>
             );
           })}

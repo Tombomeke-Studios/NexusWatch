@@ -51,4 +51,16 @@ Open http://localhost:5173.
 | `/projects/finvault` | Top-up funnel, services, queues, transactions, security |
 | `/settings` | Agents, notification channels and routing, retention, storage, theme |
 
+## Phones and tablets
+
+Below 820px the sidebar becomes a top bar (page title, open-alert badge) and a bottom tab bar
+(Overview, Heartbeats, Logs, Alerts, More); "More" opens a sheet with the remaining pages.
+Tables reflow into stacked cards and Logs moves its facets into a filter sheet.
+
+The dashboard is an installable PWA: open it in a mobile browser and use "Add to Home Screen" /
+"Install app". The production build registers a service worker (`dashboard/public/sw.js`) that
+caches only the app shell so it opens offline; `/api` is never cached, so data is always live.
+Icons live in `dashboard/public/` and are regenerated from `icon.svg` / `icon-maskable.svg` with
+`dashboard/scripts/render-icons.sh` (headless Chrome).
+
 Docs: [architecture](docs/architecture.md) · [API contract](docs/api.md) · contributor rules in [CLAUDE.md](CLAUDE.md).

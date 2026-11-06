@@ -113,11 +113,11 @@ function Body({ data }: { data: FinVaultData }) {
                   <StatusDot status={s.status} />
                   {s.name}
                 </span>
-                <span className="mono muted" style={{ flex: '1 1 60px' }}>{s.port}</span>
+                <span className="mono muted" data-label="Port" style={{ flex: '1 1 60px' }}>{s.port}</span>
                 <span style={{ flex: '1 1 90px' }}><Pill tone={statusPill[s.status]}>{statusLabel[s.status]}</Pill></span>
-                <span className="mono r" style={{ flex: '1 1 70px' }}>{p95}</span>
-                <span className="mono r" style={{ flex: '1 1 70px' }}>{formatNumber(rps)}</span>
-                <span className="mono r" style={{ flex: '1 1 70px', color: errorPct === null ? 'var(--down)' : errorPct > 1 ? 'var(--warn)' : 'var(--muted)' }}>
+                <span className="mono r" data-label="p95" style={{ flex: '1 1 70px' }}>{p95}</span>
+                <span className="mono r" data-label="req/s" style={{ flex: '1 1 70px' }}>{formatNumber(rps)}</span>
+                <span className="mono r" data-label="5xx" style={{ flex: '1 1 70px', color: errorPct === null ? 'var(--down)' : errorPct > 1 ? 'var(--warn)' : 'var(--muted)' }}>
                   {errorPct === null ? '–' : formatPercent(errorPct, 1)}
                 </span>
               </Link>
@@ -159,8 +159,8 @@ function Body({ data }: { data: FinVaultData }) {
               <div key={t.id} className="tr" style={{ minWidth: 700 }}>
                 <span className="mono muted" style={{ flex: '0 0 80px' }}>{formatClock(t.time, 'min')}</span>
                 <span style={{ flex: '1 1 90px' }}><Pill tone={TX_PILL[t.type]}>{t.type}</Pill></span>
-                <span className="mono" style={{ flex: '1 1 110px' }}>{t.wallet}</span>
-                <span className="mono r" style={{ flex: '1 1 90px', color: t.incoming ? 'var(--ok)' : 'var(--text)' }}>{t.amount}</span>
+                <span className="mono" data-label="Wallet" style={{ flex: '1 1 110px' }}>{t.wallet}</span>
+                <span className="mono r" data-label="Amount" style={{ flex: '1 1 90px', color: t.incoming ? 'var(--ok)' : 'var(--text)' }}>{t.amount}</span>
                 <span className="r" style={{ flex: '1 1 100px' }}><Pill tone={STATE_PILL[t.state]}>{t.state}</Pill></span>
               </div>
             ))}

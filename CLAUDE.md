@@ -146,12 +146,16 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `package.json` | npm workspaces (`dashboard`; room for `collector`/`agent` later) + root scripts |
 | `eslint.config.js` | Flat ESLint config (typescript-eslint + react-hooks) for all workspaces |
 | `.claude/launch.json` | Dev-server entry for the Claude browser preview |
+| `dashboard/index.html` | Viewport (`viewport-fit=cover`), `theme-color`, manifest + apple-touch-icon links, and a pre-paint script that applies the stored theme |
+| `dashboard/public/` | `favicon.svg`, PWA `manifest.webmanifest`, icons (`icon*.svg` sources → `icon-192/512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`), `sw.js` (app-shell service worker, never caches `/api`) |
+| `dashboard/scripts/render-icons.sh` | Regenerates the PNG icons from the SVG sources with headless Chrome |
 | `docs/` | `architecture.md` (data flow, planned services) · `api.md` (HTTP contract) |
 
 ### dashboard/src
 | Path | Contents |
 |---|---|
 | `main.tsx` · `App.tsx` | Providers (React Query, theme) + the route table (`routeTable`, exported for tests) |
+| `pwa.ts` | `registerServiceWorker()` — production builds only |
 | `routes.ts` | **Every URL in the app.** Build links from here, never from string literals. `logsFor(q, entryId)` deep-links into Logs: unfiltered search on `q`, that line selected |
 | `theme.tsx` | `ThemeProvider`/`useTheme` — dark (default) / light / system, stored in localStorage, sets `data-theme` on `<html>`; pure `resolveTheme` |
 | `styles/tokens.css` | Design tokens from the artifact, both themes. **The only place colours are defined** |
@@ -166,12 +170,15 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/status.ts` | Status/level/severity/project → colour, pill class and label maps |
 | `lib/ranges.ts` | Time-range options + relative axis labels |
 | `lib/config.ts` | Typed Vite env (`useMocks`, `apiBase`, `refreshMs`) |
-| `components/layout/` | `AppShell` (background + sidebar + outlet), `Sidebar` (nav, alert badge, host card), `Logo` |
+| `lib/useMediaQuery.ts` | `useMediaQuery`, `useIsNarrow` and `NARROW_QUERY` (`max-width: 820px`) — the one breakpoint, also used in `app.css` |
+| `components/layout/nav.ts` | **Every nav entry** (`NAV`) for both shells, plus pure `tabItems`, `moreItems`, `isNavActive`, `isMoreActive`, `titleFor`. A new page adds one entry here |
+| `components/layout/` | `AppShell` (background, sidebar *or* mobile bars, outlet, `theme-color` sync), `Sidebar` + `NavEntry` (desktop), `MobileNav` (`MobileTopBar`, `MobileTabBar` with the More sheet), `HostCard`, `Logo` |
+| `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
 | `components/ui/primitives.tsx` | `Pill`, `StatusDot`, `Swatch`, `Segmented`, `Switch`, `Kpi`, `PageHeader` |
 | `components/ui/charts.tsx` | `LineChart`, `Sparkline`, `BarChart`, `StatusStrip`, `Meter`, `StackBar`, `Legend`, `XAxis` — plain SVG/CSS, no chart library |
 | `components/ui/QueryState.tsx` | Loading skeleton / error (404 → "Nothing here") / `children(data)` for any query |
-| `components/ui/Icon.tsx` | The design's stroke icons by name |
+| `components/ui/Icon.tsx` | The design's stroke icons by name (plus `close`, `more`, `filter` for the mobile shell) |
 | `components/NodeCard.tsx` | Node with CPU/memory/disk meters (Heartbeats + NexusInfra) |
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
 | `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `NotFound` |
@@ -198,3 +205,17 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 - **Nothing absolutely positioned inside a scrolling card unless the card is `position: relative`**
   (`.box` is). A `.sr-only` label that escapes its card makes the whole page scroll sideways on a phone.
 - Keep the class names in `app.css` aligned with the design files so a design change maps 1:1.
+- **Narrow screens (≤ 820px) get a different shell, not just CSS.** `AppShell` mounts *either* the sidebar
+  or the mobile top/tab bars (`useIsNarrow`), so there is only one "Main navigation" landmark. jsdom has
+  no `matchMedia`, so tests see the desktop shell unless they stub it (see `AppShell.test.tsx`).
+- **New pages go in `components/layout/nav.ts`**, not in `Sidebar.tsx`: one entry shows up in the sidebar and
+  the mobile "More" sheet. Only set `tab: true` if it replaces one of the four bottom tabs.
+- **Tables (`.tbl` / `.tr`) turn into stacked cards on narrow screens** via CSS: the header row hides, the first
+  cell becomes the card title, other cells flow into a grid. Put `data-label="Column"` on every cell whose
+  value is not self-explanatory (numbers, ids, times) — it renders as the caption. No component needed.
+- **Page-level overlays on mobile use `components/ui/Sheet`** (filters, details), never a hand-rolled fixed div.
+  It portals to `body`, so `position: fixed` is not trapped by the blurred bars.
+- **Safe areas:** the top bar, tab bar, sheets and `.main` padding use `env(safe-area-inset-*)`; anything new that
+  is fixed to a screen edge must too.
+- **The service worker never caches `/api`** and only runs in production builds. Bump `CACHE` in `sw.js` when the
+  shell list changes.

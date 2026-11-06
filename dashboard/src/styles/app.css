@@ -1,5 +1,6 @@
 /* Component classes from the NexusWatch design. Keep names in sync with the design files. */
 * { box-sizing: border-box; }
+:root { --topbar-h: 56px; --tabbar-h: 56px; }
 html, body, #root { margin: 0; min-height: 100%; }
 body { background: var(--bg); color: var(--text); font: 14px/1.5 'Inter', system-ui, sans-serif; transition: background 150ms, color 150ms; }
 button, input, select { font-family: inherit; }
@@ -22,10 +23,38 @@ a { color: var(--primary); text-decoration: none; }
 .badge { margin-left: auto; background: var(--downS); color: var(--down); font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
 .host { margin-top: auto; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 
-@media (max-width: 820px) {
-  .side { position: static; height: auto; width: 100%; flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--border); }
-  .main { padding: 20px 16px 32px; }
-}
+
+/* Mobile shell (≤ 820px, see lib/useMediaQuery.ts): sticky top bar + fixed bottom tab bar. */
+.shell.mobile { flex-direction: column; flex-wrap: nowrap; }
+.shell.mobile .main { flex: 1 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) calc(var(--tabbar-h) + 24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); gap: 16px; }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; min-height: calc(var(--topbar-h) + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); background: var(--side); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.topbar-logo, .topbar-alerts, .icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 10px; color: var(--muted); position: relative; }
+.topbar-title { flex: 1; min-width: 0; font: 700 17px 'Space Grotesk', sans-serif; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-alerts .ic { width: 21px; height: 21px; flex-basis: 21px; }
+.topbar-alerts .badge { position: absolute; top: 4px; right: 2px; margin: 0; padding: 0 6px; line-height: 17px; }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; padding: 4px max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left)); background: var(--side); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--border); }
+.tab { flex: 1 1 0; min-width: 0; min-height: var(--tabbar-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: transparent; color: var(--muted); font: 600 11px 'Inter', system-ui, sans-serif; cursor: pointer; border-radius: 10px; }
+.tab.active { color: var(--primary); }
+.tab-ic { position: relative; display: inline-flex; padding: 3px 14px; border-radius: 999px; }
+.tab.active .tab-ic { background: var(--soft); }
+.tab .ic { width: 21px; height: 21px; flex-basis: 21px; }
+.tab-badge { position: absolute; top: -3px; right: 4px; min-width: 17px; padding: 0 5px; border-radius: 999px; background: var(--c-down); color: #fff; font-size: 10.5px; line-height: 17px; text-align: center; }
+.icon-btn { border: 0; background: transparent; cursor: pointer; padding: 0; }
+.icon-btn:hover, .topbar-alerts:hover { background: var(--surface2); color: var(--text); }
+
+/* Sheets (components/ui/Sheet.tsx): bottom sheet over the tab bar, or full screen for documents. */
+.sheet-wrap { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; }
+.sheet-backdrop { position: absolute; inset: 0; background: rgba(5, 7, 12, 0.55); animation: fade 160ms ease-out; }
+.sheet { position: relative; max-height: 85vh; max-height: 85dvh; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-bottom: 0; border-radius: 18px 18px 0 0; box-shadow: var(--shadow); padding-bottom: env(safe-area-inset-bottom); animation: rise 200ms ease-out; outline: 0; }
+.sheet-wrap.full .sheet { max-height: none; height: 100%; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); }
+.sheet-head { display: flex; align-items: center; gap: 12px; padding: 10px max(10px, env(safe-area-inset-right)) 10px max(20px, env(safe-area-inset-left)); border-bottom: 1px solid var(--border); }
+.sheet-head .h { flex: 1; min-width: 0; }
+.sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 14px max(14px, env(safe-area-inset-right)) 18px max(14px, env(safe-area-inset-left)); }
+.sheet-wrap.full .sheet-body { padding: 0; flex: 1; }
+.sheet-nav { display: flex; flex-direction: column; gap: 18px; }
+.sheet-nav .host { margin-top: 0; }
+@keyframes rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* Animated background */
 .bgl { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
@@ -167,4 +196,53 @@ h2.h { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .live, .grid, .skeleton { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .live, .grid, .skeleton, .sheet, .sheet-backdrop { animation: none; } }
+
+/*
+ * Narrow screens (≤ 820px). Pages stay as they are; these rules reflow them.
+ * - `.tbl` tables become stacked card rows: the header row hides, the first cell is the row's
+ *   title, the other cells flow into a grid. Give a cell `data-label="…"` to caption it
+ *   (numbers need one; self-explanatory cells such as pills don't).
+ * - Segmented controls scroll sideways instead of wrapping.
+ * - Every tap target is at least 44px.
+ */
+@media (max-width: 820px) {
+  .main > * { max-width: 100%; min-width: 0; }
+  .strip { gap: 1px !important; }
+  .strip span { min-width: 1px; }
+  h1.t { font-size: 24px; }
+  .head { gap: 12px; }
+  .head > .seg, .head > .btn, .head > a.btn { max-width: 100%; }
+  .pad { padding: 16px; }
+  .bh { padding: 14px 16px; }
+  .kpis { gap: 10px; }
+  .kpi { flex-basis: 140px; padding: 14px; }
+  .kpi .v { font-size: 28px; }
+  .cols > * { flex-basis: 100% !important; min-width: 0 !important; }
+
+  .tbl { overflow-x: visible; }
+  .tbl .tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr)); align-items: start; gap: 10px 14px; padding: 14px 16px; min-width: 0 !important; }
+  .tbl .tr.th { display: none; }
+  .tbl .tr > * { min-width: 0; overflow-wrap: anywhere; text-align: left; }
+  .tbl .tr > :first-child { grid-column: 1 / -1; font-size: 14px; }
+  .tbl .tr > .sw, .tbl .tr > button { justify-self: start; }
+  .tbl .tr > :first-child:has(+ .sw:last-child) { grid-column: auto; }
+  .tbl .tr [data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; font: 600 10.5px 'Inter', system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); width: 100%; }
+  .tbl .tr > [data-label] { flex-wrap: wrap; }
+
+  .seg { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg button { flex: 0 0 auto; white-space: nowrap; }
+
+  .btn, .btn.sm, .seg button, .seg.sm button, .inp, .chip, .fac { min-height: 44px; }
+  .chip { padding: 0 14px; }
+  .nav, .row { min-height: 44px; }
+  .bh a.end, .crumb a { display: inline-flex; align-items: center; min-height: 44px; }
+  .sw, .chk { position: relative; }
+  .sw::before, .chk::before { content: ''; position: absolute; inset: -11px -4px; }
+  .tbl .tr > [data-label] { justify-content: flex-start !important; }
+  .lr { min-height: 44px; }
+  .lr.stacked { flex-direction: column; align-items: stretch; gap: 2px; padding: 10px 16px; }
+  .lr-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; }
+  .xax { font-size: 10.5px; }
+}
