@@ -191,8 +191,48 @@ export interface MetricsOverview {
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────
+/** What a rule measures. Each maps to a metric key (see lib/rules.ts `METRICS`). */
+export type RuleMetric = 'heartbeat' | 'latency' | 'cpu' | 'memory' | 'disk' | 'queue_depth' | 'error_rate' | 'topups';
+export type Comparator = '>' | '>=' | '<' | '<=' | '==' | '!=';
+
+export interface RuleCondition {
+  metric: RuleMetric;
+  comparator: Comparator;
+  threshold: number;
+  /** How long the condition must hold before the rule fires; 0 = on the first breaching sample. */
+  forSeconds: number;
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  project: ProjectId;
+  condition: RuleCondition;
+  severity: Severity;
+  /** Channels notified the moment the rule fires. */
+  channels: ChannelId[];
+  /** Optional escalation while the alert stays unacknowledged. */
+  escalationPolicyId: string | null;
+  /** Free-text link to the runbook; empty when there is none. */
+  runbookUrl: string;
+  enabled: boolean;
+}
+
+/** Body of `POST /alert-rules` and `PUT /alert-rules/:id`. */
+export type AlertRuleInput = Omit<AlertRule, 'id'>;
+
+export type AlertNoteKind = 'acknowledged' | 'resolved' | 'note';
+
+export interface AlertNote {
+  id: string;
+  kind: AlertNoteKind;
+  text: string;
+  at: string;
+}
+
 export interface ActiveAlert {
   id: string;
+  ruleId: string;
   severity: Severity;
   project: ProjectId;
   serviceId: string;
@@ -204,32 +244,101 @@ export interface ActiveAlert {
   value: string;
   trend: number[];
   acknowledged: boolean;
-}
-
-export interface AlertRule {
-  id: string;
-  name: string;
-  condition: string;
-  project: ProjectId;
-  severity: Severity;
-  channels: string;
-  enabled: boolean;
+  acknowledgedAt: string | null;
+  /** Set while a silence (on this alert or its rule) mutes it. */
+  silenceId: string | null;
+  /** Set while a maintenance window covers it; notifications and escalation are suppressed. */
+  maintenanceId: string | null;
+  notes: AlertNote[];
 }
 
 export interface AlertHistoryItem {
   id: string;
+  /** The active alert this entry belongs to, while it exists. */
+  alertId?: string;
   open: boolean;
   title: string;
   project: ProjectId;
+  severity: Severity;
   startedAt: string;
   durationSeconds: number;
+  notes: AlertNote[];
+}
+
+export type SilenceDuration = '15m' | '1h' | '4h' | 'resolved';
+
+export interface Silence {
+  id: string;
+  kind: 'alert' | 'rule';
+  targetId: string;
+  /** Human name of what is muted (alert title or rule name), for lists. */
+  label: string;
+  reason: string;
+  createdAt: string;
+  /** null = until the alert (or every alert of the rule) resolves. */
+  endsAt: string | null;
+}
+
+/** Body of `POST /silences`. */
+export interface SilenceInput {
+  kind: Silence['kind'];
+  targetId: string;
+  duration: SilenceDuration;
+  reason: string;
+}
+
+export interface MaintenanceWindow {
+  id: string;
+  title: string;
+  project: ProjectId;
+  /** null = the whole project. */
+  serviceId: string | null;
+  startsAt: string;
+  durationMinutes: number;
+  recurrence: 'none' | 'weekly';
+}
+
+export type MaintenanceInput = Omit<MaintenanceWindow, 'id'>;
+
+export interface EscalationStep {
+  channel: ChannelId;
+  /** Minutes after the alert fired; steps after the first only run while it is unacknowledged. */
+  afterMinutes: number;
+}
+
+export interface EscalationPolicy {
+  id: string;
+  name: string;
+  steps: EscalationStep[];
+}
+
+export type EscalationPolicyInput = Omit<EscalationPolicy, 'id'>;
+
+/** A service a maintenance window can target. */
+export interface ServiceRef {
+  id: string;
+  name: string;
+  project: ProjectId;
+}
+
+export type TargetState = 'firing' | 'pending' | 'ok' | 'no_data';
+
+/** Result of `POST /alert-rules/test`: the rule evaluated against the current data. */
+export interface RuleTestResult {
+  evaluatedAt: string;
+  fires: boolean;
+  targets: { target: string; serviceId?: string; state: TargetState; value: number | null; heldSeconds: number }[];
 }
 
 export interface AlertsData {
-  summary: { critical: number; warning: number; muted: number; resolved24h: number; resolvedAuto24h: number; mttrMinutes: number };
+  summary: { critical: number; warning: number; muted: number; inMaintenance: number; resolved24h: number; resolvedAuto24h: number; mttrMinutes: number };
   active: ActiveAlert[];
   rules: AlertRule[];
   history: AlertHistoryItem[];
+  silences: Silence[];
+  maintenance: MaintenanceWindow[];
+  policies: EscalationPolicy[];
+  services: ServiceRef[];
 }
 
 // ── Service detail ─────────────────────────────────────────────────────

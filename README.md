@@ -72,7 +72,7 @@ Also `NW_PORT` (8080), `NW_DB_PATH`, intervals, timeouts and thresholds, all lis
 | `/heartbeats` | Nodes, 60-day monitors, incidents |
 | `/logs` | Search, filters, histogram, facets, log lines + document |
 | `/metrics` | CPU / memory / disk / network / queues with statistics and top consumers |
-| `/alerts` | Active alerts, rules, history |
+| `/alerts` | Active alerts (acknowledge/resolve with a note, mute, escalation steps), rule editor with live validation and "test against current data", silences, maintenance windows, escalation policies, filterable history |
 | `/services/:id` | Service detail: outage banner, response time, checks, dependencies, logs, timeline |
 | `/projects/nexusinfra` | Nodes, containers, platform components, payments |
 | `/projects/finvault` | Top-up funnel, services, queues, transactions, security |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBudgetMinutes, formatBurn, formatBytes, formatDuration, formatEur, formatExhaustion, formatLatency, formatPercent, formatSignedEur, formatWhen } from './format';
+import { formatBudgetMinutes, formatBurn, formatBytes, formatDuration, formatEur, formatExhaustion, formatLatency, formatPercent, formatSignedEur, formatWeekly, formatWhen, fromLocalInput, toLocalInput } from './format';
 
 describe('format', () => {
   it('formats euros', () => {
@@ -61,5 +61,19 @@ describe('reliability formatting', () => {
     expect(formatExhaustion(0)).toBe('exhausted');
     expect(formatExhaustion(864)).toBe('14h 24m');
     expect(formatExhaustion(null)).toBe('no data');
+  });
+});
+
+describe('datetime-local values', () => {
+  it('round-trips a UTC instant through the local wall clock', () => {
+    const iso = new Date(2026, 10, 8, 3, 5).toISOString();
+    expect(toLocalInput(iso)).toBe('2026-11-08T03:05');
+    expect(fromLocalInput('2026-11-08T03:05')).toBe(iso);
+    expect(fromLocalInput('')).toBe('');
+    expect(fromLocalInput('nonsense')).toBe('');
+  });
+
+  it('names the weekday of a weekly schedule', () => {
+    expect(formatWeekly(new Date(2026, 10, 8, 3, 0).toISOString())).toBe('Sun 03:00');
   });
 });

@@ -58,6 +58,8 @@ function activeFromIncidents(ctx: Ctx, now: number): ActiveAlert[] {
         : [];
       return {
         id: i.id,
+        // The sample rule set's ids: service down per project (r1/r2), node offline (r3).
+        ruleId: isService ? (i.project === 'finvault' ? 'r2' : 'r1') : 'r3',
         severity: i.severity,
         project: i.project,
         serviceId: name,
@@ -69,6 +71,11 @@ function activeFromIncidents(ctx: Ctx, now: number): ActiveAlert[] {
         value: isService ? 'timeout' : 'offline',
         trend,
         acknowledged: acks.has(i.id),
+        // Not tracked live yet: when it was acknowledged, silences and maintenance windows.
+        acknowledgedAt: null,
+        silenceId: null,
+        maintenanceId: null,
+        notes: [],
       };
     });
 }
@@ -90,10 +97,16 @@ export function alerts(ctx: Ctx): AlertsData {
   const resolved24h = resolved.filter((i) => (i.endedAt as number) >= now - DAY_MS).length;
   const mttr = resolved.length ? resolved.reduce((sum, i) => sum + ((i.endedAt as number) - i.startedAt), 0) / resolved.length / 60_000 : 0;
   return {
+    // Escalation policies and the service picker come from the sample set; silences and maintenance
+    // windows are not stored live yet (TODO.md), so none apply.
+    ...ctx.sample.alerts(),
+    silences: [],
+    maintenance: [],
     summary: {
       critical: active.filter((a) => a.severity === 'critical').length,
       warning: active.filter((a) => a.severity === 'warning').length,
       muted: 0,
+      inMaintenance: 0,
       resolved24h,
       // Nobody resolves incidents by hand yet: every resolution is the check passing again.
       resolvedAuto24h: resolved24h,
@@ -101,6 +114,16 @@ export function alerts(ctx: Ctx): AlertsData {
     },
     active,
     rules: rules(ctx),
-    history: month.map((i) => ({ id: i.id, open: i.endedAt === null, title: i.title, project: i.project, startedAt: iso(i.startedAt), durationSeconds: seconds((i.endedAt ?? now) - i.startedAt) })),
+    history: month.map((i) => ({
+      id: i.id,
+      ...(i.endedAt === null ? { alertId: i.id } : {}),
+      open: i.endedAt === null,
+      title: i.title,
+      project: i.project,
+      severity: i.severity,
+      startedAt: iso(i.startedAt),
+      durationSeconds: seconds((i.endedAt ?? now) - i.startedAt),
+      notes: [],
+    })),
   };
 }

@@ -190,17 +190,21 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
 | `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
+| `lib/rules.ts` | Pure alerting logic: `METRICS`, parse/format/validate rule conditions and durations, `evaluateReading`/`evaluateRule`, rule drafts (editor state), silences, maintenance windows, `escalationProgress`, `filterHistory` |
+| `lib/useNow.ts` | `useNow(ms)` — ticking clock for countdowns |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
 | `components/ui/primitives.tsx` | `Pill`, `StatusDot`, `Swatch`, `Segmented`, `Switch`, `Kpi`, `PageHeader` |
 | `components/ui/charts.tsx` | `LineChart`, `Sparkline`, `BarChart`, `StatusStrip`, `Meter`, `StackBar`, `Legend`, `XAxis` — plain SVG/CSS, no chart library |
 | `components/ui/QueryState.tsx` | Loading skeleton / error (404 → "Nothing here") / `children(data)` for any query |
 | `components/ui/Icon.tsx` | The design's stroke icons by name (plus `close`, `more`, `filter` for the mobile shell) |
+| `components/ui/Dialog.tsx` | `Dialog` (portal, focus trap, Escape, focus back to the opener, scroll lock) + `ConfirmDialog` (Cancel focused). Styles in `styles/dialog.css`, which also holds the form-field classes (`.fld`, `.frow`, `.ckl`, `.form-err`) |
 | `components/NodeCard.tsx` | Node with CPU/memory/disk meters (Heartbeats + NexusInfra) |
 | `components/SloCard.tsx` | A service's SLO in one small card (Service detail), linking to its burn-down on `/slo?service=…` |
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
 | `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Business`, `Settings`, `Slo` (`/slo`), `Incidents` + `IncidentDetail` (`/incidents/:incidentId`), `StatusPage` (`/status`, outside the shell), `NotFound` |
 | `styles/reliability.css` | Classes for the SLO, incident and status pages (forms, lifecycle steps, update timeline, `.sp` status layout). Imported by those pages, not by `main.tsx` |
 | `pages/Business.tsx` · `Business.css` | `/business`: top-up reconciliation (KPIs, anomalies, pipeline), credit and standing, event bus health. Own stylesheet (`biz-*` classes) imported by the page |
+| `pages/alerts/` | Alerts page parts: `panels.tsx` (Active, Rules, Silences, Maintenance, Escalation, History tabs), `RuleEditor.tsx`, `dialogs.tsx` (mute, ack/resolve note, maintenance, escalation policy), `shared.tsx` (`Field`, `useChannels`). Page styles in `styles/alerts.css` |
 | `test/setup.ts` | jest-dom + in-memory localStorage (see gotchas) |
 | `../Dockerfile` · `../nginx/default.conf.template` | Dashboard image built with `VITE_USE_MOCKS=false`; nginx proxies `/api` to `NW_API_UPSTREAM` |
 
@@ -279,3 +283,13 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   is fixed to a screen edge must too.
 - **The service worker never caches `/api`** and only runs in production builds. Bump `CACHE` in `sw.js` when the
   shell list changes.
+- **Rule conditions are structured** (`metric`, `comparator`, `threshold`, `forSeconds`), never a free-text
+  string. Render them with `formatCondition`; the editor's form state is a `RuleDraft` and only
+  `validateDraft` turns it into an API body. The mock validates with the same functions and answers 422.
+- **Open a dialog by mounting it, close it by unmounting** (`{open && <Dialog …/>}`) — focus return depends
+  on it. Form dialogs pass `closeOnBackdrop={false}`. Use `ConfirmDialog` for anything destructive.
+- **Don't mark a field touched on blur in a dialog:** StrictMode's dev remount moves focus away and back,
+  which fires a blur before the user has typed. Validate on change and on submit.
+- **Inside a column form, `.fld` has no flex-basis** — only `.frow > .fld` does; a basis in a column becomes a height.
+- Every alerting mutation goes through `useAlertingMutation` in `queries.ts`, which invalidates both
+  `alerts` and `nav` (resolving changes the sidebar badge).

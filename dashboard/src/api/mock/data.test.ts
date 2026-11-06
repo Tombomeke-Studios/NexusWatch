@@ -39,10 +39,14 @@ describe('mock data', () => {
 
   it('persists rule toggles and acknowledgements', () => {
     mock.setRuleEnabled('r8', true);
-    mock.acknowledgeAlert('al_1');
+    mock.acknowledgeAlert('al_1', 'Looking into it');
     const a = mock.alerts();
     expect(a.rules.find((r) => r.id === 'r8')?.enabled).toBe(true);
-    expect(a.active.find((x) => x.id === 'al_1')?.acknowledged).toBe(true);
+    const al1 = a.active.find((x) => x.id === 'al_1');
+    expect(al1?.acknowledged).toBe(true);
+    expect(al1?.acknowledgedAt).not.toBeNull();
+    expect(al1?.notes).toMatchObject([{ kind: 'acknowledged', text: 'Looking into it' }]);
+    expect(a.history.find((h) => h.alertId === 'al_1')?.notes).toHaveLength(1);
   });
 
   it('routes every severity to every configured channel, Telegram included', () => {

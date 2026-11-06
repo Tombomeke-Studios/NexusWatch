@@ -89,3 +89,23 @@ export function formatExhaustion(minutes: number | null): string {
   if (minutes <= 0) return 'exhausted';
   return formatDuration(minutes * 60);
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Weekday and local time, for weekly schedules: `Sun 03:00`. */
+export function formatWeekly(iso: string): string {
+  return `${WEEKDAYS[new Date(iso).getDay()]} ${formatClock(iso, 'min')}`;
+}
+
+/** A UTC instant as the value of an `<input type="datetime-local">` (local wall clock, minutes). */
+export function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** The inverse of `toLocalInput`: a local wall-clock value back to UTC ISO; '' when empty or invalid. */
+export function fromLocalInput(value: string): string {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+}
