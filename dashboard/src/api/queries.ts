@@ -27,6 +27,7 @@ export const keys = {
   incidents: ['incidents'] as const,
   incident: (id: string) => ['incidents', id] as const,
   statusPage: ['status-page'] as const,
+  business: ['business'] as const,
 };
 
 export const useHost = () => useQuery({ queryKey: keys.host, queryFn: api.host, ...live });
@@ -41,6 +42,7 @@ export const useAlerts = () => useQuery({ queryKey: keys.alerts, queryFn: api.al
 export const useService = (id: string) => useQuery({ queryKey: keys.service(id), queryFn: () => api.service(id), ...live });
 export const useNexusInfra = () => useQuery({ queryKey: keys.nexusInfra, queryFn: api.nexusInfra, ...live });
 export const useFinVault = () => useQuery({ queryKey: keys.finVault, queryFn: api.finVault, ...live });
+export const useBusiness = () => useQuery({ queryKey: keys.business, queryFn: api.business, ...live });
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.settings });
 
 export function useAcknowledgeAlert() {

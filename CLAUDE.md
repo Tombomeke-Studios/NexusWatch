@@ -188,6 +188,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/layout/nav.ts` | **Every nav entry** (`NAV`) for both shells, plus pure `tabItems`, `moreItems`, `isNavActive`, `isMoreActive`, `titleFor`. A new page adds one entry here |
 | `components/layout/` | `AppShell` (background, sidebar *or* mobile bars, outlet, `theme-color` sync), `Sidebar` + `NavEntry` (desktop), `MobileNav` (`MobileTopBar`, `MobileTabBar` with the More sheet), `HostCard`, `Logo` |
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
+| `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
+| `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
 | `components/ui/primitives.tsx` | `Pill`, `StatusDot`, `Swatch`, `Segmented`, `Switch`, `Kpi`, `PageHeader` |
 | `components/ui/charts.tsx` | `LineChart`, `Sparkline`, `BarChart`, `StatusStrip`, `Meter`, `StackBar`, `Legend`, `XAxis` — plain SVG/CSS, no chart library |
@@ -196,8 +198,9 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/NodeCard.tsx` | Node with CPU/memory/disk meters (Heartbeats + NexusInfra) |
 | `components/SloCard.tsx` | A service's SLO in one small card (Service detail), linking to its burn-down on `/slo?service=…` |
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
-| `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `Slo` (`/slo`), `Incidents` + `IncidentDetail` (`/incidents/:incidentId`), `StatusPage` (`/status`, outside the shell), `NotFound` |
+| `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Business`, `Settings`, `Slo` (`/slo`), `Incidents` + `IncidentDetail` (`/incidents/:incidentId`), `StatusPage` (`/status`, outside the shell), `NotFound` |
 | `styles/reliability.css` | Classes for the SLO, incident and status pages (forms, lifecycle steps, update timeline, `.sp` status layout). Imported by those pages, not by `main.tsx` |
+| `pages/Business.tsx` · `Business.css` | `/business`: top-up reconciliation (KPIs, anomalies, pipeline), credit and standing, event bus health. Own stylesheet (`biz-*` classes) imported by the page |
 | `test/setup.ts` | jest-dom + in-memory localStorage (see gotchas) |
 | `../Dockerfile` · `../nginx/default.conf.template` | Dashboard image built with `VITE_USE_MOCKS=false`; nginx proxies `/api` to `NW_API_UPSTREAM` |
 
@@ -253,6 +256,11 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   `queries.ts`; never call `fetch` from a page.
 - **Node 25 ships its own `localStorage` global** that shadows jsdom's and has no working methods —
   `test/setup.ts` installs an in-memory one. Don't remove it.
+- **The backend reports top-up facts; the dashboard reconciles them** (`lib/reconcile.ts`). Never add a
+  verdict field (`anomaly`, `ok`) to `TopUpRecord` — the rules would then live in two places. Judge with
+  the response's `topUpTimeoutMs` and the query's `dataUpdatedAt`, not a constant or a fresh `Date.now()`.
+- **No personal data on the Business page.** Ids only; a payer email arrives masked and goes through
+  `maskEmail` again on display.
 - **Intl's short month names differ per ICU build** (`Sep` vs `Sept`), so `formatWhen` uses a fixed list.
 - **Nothing absolutely positioned inside a scrolling card unless the card is `position: relative`**
   (`.box` is). A `.sr-only` label that escapes its card makes the whole page scroll sideways on a phone.

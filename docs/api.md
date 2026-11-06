@@ -29,6 +29,7 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 | `GET /projects/nexusinfra` | | `NexusInfraData` | Project NexusInfra |
 | `GET /projects/finvault` | | `FinVaultData` | Project FinVault |
 | `GET /settings` | | `SettingsData` | Settings |
+| `GET /business` | | `BusinessData` | Business (money flow FinVault → NexusInfra) |
 
 ## Write
 
@@ -103,3 +104,29 @@ to enforce that. Components have a public `slug` and name and may group several 
 only their public updates. `days` holds 90 entries, oldest first; `null` is a day without data and is
 drawn as "no data", never as up. `recent` holds public incidents resolved in the last 14 days;
 `maintenance` holds windows that have not ended yet.
+
+## Business (`GET /business`)
+
+The money flow between the two platforms, as both sides recorded it. The backend reports **facts, not
+verdicts**: the dashboard reconciles them itself with the rules in `dashboard/src/lib/reconcile.ts`, so
+the rules are tested once and the backend cannot quietly disagree with them.
+
+- `topUpTimeoutMs` and `lowCreditHours` are NexusInfra's own `TOPUP_TIMEOUT_MS` and `LOW_CREDIT_HOURS`,
+  read from the Billing Bridge's configuration, so the page judges with the bridge's clock.
+- `topUps` — every top-up requested in the last 7 days, newest first. Per top-up: the reference
+  NexusInfra issued, the account id, the requested amount, whether the broker took `payment.request`
+  (`sent`), the bridge's ledger status and when it turned *Not confirmed*, FinVault's answer as seen on
+  the bus (`events.payment.*` or `bank.payment.*`, matched on the reference) and every credit-ledger
+  entry carrying the reference. `credits` is a list on purpose: two entries is the anomaly to catch.
+- `payer` is the payer's email **masked by the backend** (`t***@e***.com`) or null. A full address must
+  never be returned; the dashboard masks again on display as a safety net. Everything else is ids.
+- `accounts` — each account's standing: balance, available (balance less usage not yet charged),
+  `canRun`, `hoursLeft` (null with nothing running — no estimate, not zero and not infinite), running
+  servers, and when `billing.credit.low` was published for the current dip.
+- `suspended` — servers stopped by `billing.server.suspend`, with when and why.
+- `revenueByPlan` — usage charged at each plan's rate, per day for 30 days, and its total.
+- `bus` — `finvault.events` throughput per minute (last hour), the dead-letter queue, each publisher's
+  outbox (pending + dropped) and each queue's bindings, consumers and ready count. **A broker or service
+  that could not be asked is `null`, never `0`** — the DLQ then carries the `error` that said why, as in
+  NexusInfra's Control Room DLQ watch (#243).
+

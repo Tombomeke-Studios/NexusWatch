@@ -523,3 +523,103 @@ export interface StatusPageData {
   recent: PublicIncident[];
   maintenance: Maintenance[];
 }
+
+// ── Business (FinVault → NexusInfra money flow) ────────────────────────
+/** The Billing Bridge's own status for a top-up (NexusInfra #298, #351). */
+export type TopUpLedgerStatus = 'pending' | 'confirmed' | 'failed' | 'not-confirmed';
+
+/**
+ * One top-up as both sides recorded it. NexusWatch only observes: the dashboard reconciles
+ * these records itself (lib/reconcile.ts), so the backend reports facts, not verdicts.
+ */
+export interface TopUpRecord {
+  /** The reference NexusInfra issued with `payment.request`; FinVault answers with it. */
+  reference: string;
+  accountId: string;
+  /** Masked by the backend (`t***@e***.com`) — never a full address. */
+  payer: string | null;
+  amountEur: number;
+  requestedAt: string;
+  /** Whether the broker took `payment.request`. Not sent = failed at once, never pending. */
+  sent: boolean;
+  status: TopUpLedgerStatus;
+  /** When the bridge turned it *Not confirmed* (`TOPUP_TIMEOUT_MS`); null if it never did. */
+  expiredAt: string | null;
+  /** FinVault's answer as seen on the bus (`events.payment.*` / `bank.payment.*`); null = none yet. */
+  finvault: { outcome: 'confirmed' | 'failed'; at: string; amountEur: number; reason: string | null } | null;
+  /** Credit-ledger entries carrying this reference, oldest first. Exactly one is the healthy case. */
+  credits: { at: string; amountEur: number }[];
+}
+
+/** An account's standing at the Billing Bridge (#365, #379). Ids only. */
+export interface AccountStanding {
+  accountId: string;
+  planId: string;
+  balanceEur: number;
+  /** Balance less usage not yet charged. */
+  availableEur: number;
+  canRun: boolean;
+  /** How long what is left lasts at the running servers' rate; null = nothing running (no estimate). */
+  hoursLeft: number | null;
+  runningServers: number;
+  /** When `billing.credit.low` was last published for this dip; null = not warned. */
+  lowCreditWarnedAt: string | null;
+}
+
+/** A server stopped by `billing.server.suspend` (#380). */
+export interface SuspendedServer {
+  deploymentId: string;
+  accountId: string;
+  suspendedAt: string;
+  reason: string;
+}
+
+export interface PlanRevenue {
+  planId: string;
+  name: string;
+  color: ChartColor;
+  accounts: number;
+  revenueEur: number;
+  /** Usage charged at this plan's rate per day, last 30 days, oldest first. */
+  perDay: number[];
+}
+
+export interface BusQueue {
+  name: string;
+  /** Routing keys bound to it on `finvault.events`. */
+  bindings: string[];
+  /** null = the broker could not be asked. */
+  consumers: number | null;
+  ready: number | null;
+}
+
+export interface OutboxState {
+  /** The publisher holding the outbox (#167). */
+  service: string;
+  /** null = the service did not report. */
+  pending: number | null;
+  dropped: number | null;
+}
+
+export interface BusHealth {
+  exchange: string;
+  /** Messages published on the exchange per minute, last 60 minutes, oldest first. */
+  throughputPerMin: number[];
+  /** Dead-letter queue (#243): depth null = unknown, never 0. */
+  dlq: { name: string; depth: number | null; error: string | null; checkedAt: string };
+  outboxes: OutboxState[];
+  queues: BusQueue[];
+}
+
+export interface BusinessData {
+  /** NexusInfra's `TOPUP_TIMEOUT_MS`, so the dashboard judges with the bridge's own clock. */
+  topUpTimeoutMs: number;
+  /** NexusInfra's `LOW_CREDIT_HOURS`. */
+  lowCreditHours: number;
+  /** Top-ups requested in the last 7 days, newest first. */
+  topUps: TopUpRecord[];
+  accounts: AccountStanding[];
+  suspended: SuspendedServer[];
+  revenueByPlan: PlanRevenue[];
+  bus: BusHealth;
+}

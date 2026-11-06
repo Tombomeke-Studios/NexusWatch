@@ -7,7 +7,7 @@ describe('nav', () => {
   });
 
   it('puts every non-tab entry in the More sheet', () => {
-    expect(moreItems().map((i) => i.label)).toEqual(['Metrics', 'SLOs', 'Incidents', 'NexusInfra', 'FinVault', 'Settings']);
+    expect(moreItems().map((i) => i.label)).toEqual(['Metrics', 'SLOs', 'Incidents', 'NexusInfra', 'FinVault', 'Business', 'Settings']);
     expect(tabItems().length + moreItems().length).toBe(NAV.length);
   });
 

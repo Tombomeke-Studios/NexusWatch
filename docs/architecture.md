@@ -78,5 +78,11 @@ built with `VITE_USE_MOCKS=false`, served by nginx, which proxies `/api` to the 
   gateway events (`bank.payment.*` and `events.<type>` keys on the same exchange).
 - **Alert rule evaluation and notification delivery** (Discord, Telegram, SMTP, ntfy).
 
+- **Business view** (`/business`): the collector would read the Billing Bridge's top-up ledger, credit
+  ledger, standing and suspensions (hosted edition only), watch `payment.request` and FinVault's
+  `payment.confirmed`/`payment.failed` on the exchange (both key spellings), and ask the broker for queue
+  depths, consumers and `finvault.events.dlq`. It reports what each side recorded; the dashboard
+  reconciles (`lib/reconcile.ts`). Payer emails are masked before they leave the collector.
+
 Open decisions: authentication for the dashboard; whether the collector should measure node
 resources itself or keep relying on NexusInfra's heartbeats.

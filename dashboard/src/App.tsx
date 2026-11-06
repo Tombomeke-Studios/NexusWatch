@@ -9,6 +9,7 @@ import { ServiceDetailPage } from '@/pages/ServiceDetail';
 import { NexusInfraPage } from '@/pages/projects/NexusInfra';
 import { FinVaultPage } from '@/pages/projects/FinVault';
 import { SettingsPage } from '@/pages/Settings';
+import { BusinessPage } from '@/pages/Business';
 import { NotFoundPage } from '@/pages/NotFound';
 import { SloPage } from '@/pages/Slo';
 import { IncidentsPage } from '@/pages/Incidents';
@@ -32,6 +33,7 @@ export const routeTable: RouteObject[] = [
       { path: 'slo', element: <SloPage /> },
       { path: 'incidents', element: <IncidentsPage /> },
       { path: 'incidents/:incidentId', element: <IncidentDetailPage /> },
+      { path: 'business', element: <BusinessPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

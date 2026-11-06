@@ -37,6 +37,7 @@ export const NAV: NavItem[] = [
   { to: routes.incidents, label: 'Incidents', icon: 'incident', group: 'main' },
   { to: routes.project('nexusinfra'), label: 'NexusInfra', swatch: 'var(--c-nx)', group: 'projects', count: 'nexusinfra' },
   { to: routes.project('finvault'), label: 'FinVault', swatch: 'var(--c-fv)', group: 'projects', count: 'finvault' },
+  { to: routes.business, label: 'Business', swatch: 'linear-gradient(135deg, var(--c-fv), var(--c-nx))', group: 'projects' },
   { to: routes.settings, label: 'Settings', icon: 'settings', group: 'system' },
 ];
 

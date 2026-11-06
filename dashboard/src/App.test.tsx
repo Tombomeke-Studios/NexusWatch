@@ -30,6 +30,7 @@ describe('routing', () => {
     ['/slo', 'SLOs'],
     ['/incidents', 'Incidents'],
     ['/status', 'Service status'],
+    ['/business', 'Business'],
     ['/nope', 'Page not found'],
   ])('%s renders the "%s" page heading', async (path, heading) => {
     renderAt(path);

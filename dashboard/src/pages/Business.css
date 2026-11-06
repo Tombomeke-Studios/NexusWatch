@@ -1,0 +1,36 @@
+/* Business page. Own file so it never collides with app.css; colours only from tokens.css. */
+
+.biz-section { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin: 8px 0 -6px; }
+.biz-section h2 { font: 700 17px 'Space Grotesk', sans-serif; letter-spacing: -0.01em; margin: 0; }
+
+/* The three-step pipeline of one top-up: sent → FinVault → wallet. */
+.biz-steps { display: flex; align-items: center; gap: 0; min-width: 0; }
+.biz-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 74px; font-size: 11px; line-height: 1.2; text-align: center; color: var(--muted); }
+.biz-step > i { display: block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid transparent; }
+.biz-step.done > i { background: var(--c-ok); }
+.biz-step.late > i { background: var(--c-warn); }
+.biz-step.failed > i { background: var(--c-down); }
+.biz-step.failed { color: var(--down); }
+.biz-step.late { color: var(--warn); }
+.biz-step.waiting > i { border-color: var(--c-sky); border-style: dashed; }
+.biz-step.skipped > i { border-color: var(--border2); }
+.biz-step.skipped { color: var(--subtle); }
+.biz-join { flex: 1 1 12px; min-width: 12px; height: 2px; background: var(--border2); margin-bottom: 16px; }
+
+/* Anomaly list. */
+.biz-anom { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 12px 20px; border-bottom: 1px solid var(--surface2); border-left: 3px solid var(--border2); }
+.biz-anom:last-child { border-bottom: 0; }
+.biz-anom.critical { border-left-color: var(--c-down); }
+.biz-anom.warning { border-left-color: var(--c-warn); }
+.biz-anom.info { border-left-color: var(--c-sky); }
+.biz-anom .reason { flex: 1 1 100%; color: var(--muted); font-size: 13px; }
+
+.biz-unknown { color: var(--warn); font-style: italic; }
+.biz-reason { display: block; margin-top: 3px; font-size: 12px; color: var(--subtle); white-space: normal; }
+
+.biz-list { display: flex; flex-direction: column; padding: 4px 8px 10px; }
+.biz-big { font-size: 30px; line-height: 1.1; }
+
+/* 60 per-minute bars must fit a phone-width card: the default 4px gap and 3px minimum do not. */
+.biz-dense .bars { gap: 1px; }
+.biz-dense .bars span { min-width: 1px; }

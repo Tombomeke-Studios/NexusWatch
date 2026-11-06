@@ -19,4 +19,6 @@ export const routes = {
   incident: (id: string) => `/incidents/${encodeURIComponent(id)}`,
   /** Public, shareable status page — rendered without the app shell. */
   status: '/status',
+  /** Money flow FinVault → NexusInfra: top-up reconciliation, credit, event bus. */
+  business: '/business',
 } as const;
