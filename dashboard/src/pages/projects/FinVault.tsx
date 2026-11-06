@@ -116,7 +116,7 @@ function Body({ data }: { data: FinVaultData }) {
                 <span className="mono muted" data-label="Port" style={{ flex: '1 1 60px' }}>{s.port}</span>
                 <span style={{ flex: '1 1 90px' }}><Pill tone={statusPill[s.status]}>{statusLabel[s.status]}</Pill></span>
                 <span className="mono r" data-label="p95" style={{ flex: '1 1 70px' }}>{p95}</span>
-                <span className="mono r" data-label="req/s" style={{ flex: '1 1 70px' }}>{formatNumber(rps)}</span>
+                <span className="mono r" data-label="req/s" style={{ flex: '1 1 70px' }}>{rps === null ? '–' : formatNumber(rps)}</span>
                 <span className="mono r" data-label="5xx" style={{ flex: '1 1 70px', color: errorPct === null ? 'var(--down)' : errorPct > 1 ? 'var(--warn)' : 'var(--muted)' }}>
                   {errorPct === null ? '–' : formatPercent(errorPct, 1)}
                 </span>

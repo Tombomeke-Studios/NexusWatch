@@ -1,0 +1,8 @@
+[
+  { "id": "nx-control-room", "name": "control-room", "project": "nexusinfra", "url": "http://localhost:9000/health" },
+  { "id": "nx-node-agent", "name": "node-agent", "project": "nexusinfra", "url": "http://localhost:9100/health" },
+  { "id": "nx-orchestrator", "name": "orchestrator", "project": "nexusinfra", "url": "http://localhost:9200/health" },
+  { "id": "nx-billing-bridge", "name": "billing-bridge", "project": "nexusinfra", "url": "http://localhost:9300/health" },
+  { "id": "nx-gateway", "name": "gateway", "project": "nexusinfra", "url": "http://localhost:9400/health" },
+  { "id": "fv-api-gateway", "name": "api-gateway", "project": "finvault", "url": "http://localhost:8000/health" }
+]

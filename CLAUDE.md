@@ -3,7 +3,8 @@
 Monitoring dashboard for the tombomeke-studio platforms: one place for heartbeats, logs, metrics and
 alerts of **NexusInfra** (Docker server management) and **FinVault** (banking platform), plus the
 business link between them (FinVault top-ups paying for NexusInfra capacity).
-Currently: a React + TypeScript dashboard (Vite) running on built-in sample data behind a typed API layer.
+Currently: a React + TypeScript dashboard (Vite) behind a typed API layer, and the `collector` backend that
+serves that API from real sources where configured and from the dashboard's sample data everywhere else.
 This file is **context + rules only** — all tasks and progress live in [TODO.md](TODO.md).
 
 Design source of truth: the **NexusWatch Monitoring** design artifact (claude.ai, nine artboards:
@@ -26,14 +27,15 @@ When the design and this repo disagree on look or layout, the design wins; on be
 and open feature branches → set default branch to `dev` → create an issue for every open TODO item and
 replace each `(#—)` with its `(#N)` → from then on, sections 2a and 2b apply in full, including pushing.
 
-**What exists:** every page from the design, routed, wired to React Query hooks, served by sample data
-(`VITE_USE_MOCKS=true`). **What does not:** any backend. `dashboard/src/api/endpoints.ts` already
-names the HTTP paths the backend must serve; [docs/api.md](docs/api.md) is the contract.
+**What exists:** every page from the design, routed, wired to React Query hooks; the `collector`
+workspace serving every path of [docs/api.md](docs/api.md) (health checks, Control Room, Prometheus
+scrape, event-bus heartbeats → SQLite; sample data for anything without a source).
+**What does not:** the agent, alert-rule evaluation, notification delivery, FinVault business data.
 
 **Relation to the other projects.** NexusWatch is a *read-only observer*. It never changes NexusInfra
-or FinVault state and never shares their databases. Planned data sources (not built): NexusInfra's
+or FinVault state and never shares their databases. Built data sources (collector): NexusInfra's
 Control Room `/status` + `/uptime`, every service's `/health` and Prometheus `/metrics`, the
-`monitoring.heartbeat.#` routing keys on the `finvault.events` exchange, and FinVault's gateway events.
+`monitoring.heartbeat.#` routing keys on the `finvault.events` exchange. Not yet: FinVault's gateway events.
 Consuming that exchange means following NexusInfra's wire rules (`readPayload()`, never rename the
 exchange, never change the encryption constants).
 
@@ -107,11 +109,13 @@ PR to `dev`, wait for CI) → move the group to Done in TODO.md.
 ## 4. Testing rules
 
 - **Vitest**, colocated `*.test.ts(x)` next to the source (`lib/series.test.ts` pattern).
-- **Pure logic must be tested**: everything in `lib/`, `api/client.ts`, and the mock contract (`api/mock/data.test.ts`).
+- **Pure logic must be tested**: everything in `lib/`, `api/client.ts`, and the mock contract (`api/mock/data.test.ts`);
+  in the collector every source adapter, the store and the series helpers (fake `fetch` + clock, `:memory:` SQLite).
 - **Pages**: `App.test.tsx` renders every route and checks its `<h1>`. A new route adds a row there.
 - **The mock data is a stand-in for the backend** — `data.test.ts` guards its invariants (counts add up,
-  a down service has a `null` latency, filters filter). When the real API arrives, the same invariants
-  become contract tests against it.
+  a down service has a `null` latency, filters filter). `collector/src/contract.test.ts` checks the same
+  invariants against the collector's HTTP answers, with no sources and with live (fake) sources.
+  A new invariant goes in both.
 - **Bug fixes:** write the test that catches the bug first, when feasible.
 
 ## 5. Documentation rules — which doc owns what
@@ -132,23 +136,30 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | What | Command (repo root) |
 |---|---|
 | Install | `npm install` |
-| Dev server (http://localhost:5173) | `npm run dev` |
-| Production build | `npm run build` |
-| Tests | `npm test` |
+| Collector + dashboard on the collector (5173 → `/api` → 8080) | `npm run dev` |
+| Dashboard alone on sample data | `npm run dev:mocks` |
+| Collector alone (http://localhost:8080, reads root `.env`) | `npm run dev:collector` |
+| Production build (dashboard bundle + collector typecheck) | `npm run build` |
+| Tests (both workspaces) | `npm test` |
 | Lint | `npm run lint` |
-| Use a real backend | set `VITE_USE_MOCKS=false` in `dashboard/.env`; `/api` is proxied to `NW_API_TARGET` (default `http://localhost:8080`) |
+| Containers (collector + nginx dashboard, http://localhost:8088) | `docker compose up --build` |
+| Point the collector at real sources | copy `.env.example` to `.env` (repo root) and set the `NW_*` variables |
+| Dashboard against another backend | `/api` is proxied to `NW_API_TARGET` (default `http://localhost:8080`) |
 
 ## 7. Codebase map — where is what
 
 ### Root
 | Path | Contents |
 |---|---|
-| `package.json` | npm workspaces (`dashboard`; room for `collector`/`agent` later) + root scripts |
+| `package.json` | npm workspaces (`dashboard`, `collector`; room for `agent`) + root scripts |
+| `scripts/dev.mjs` | `npm run dev`: starts collector + dashboard, prefixes their output |
 | `eslint.config.js` | Flat ESLint config (typescript-eslint + react-hooks) for all workspaces |
-| `.claude/launch.json` | Dev-server entry for the Claude browser preview |
 | `dashboard/index.html` | Viewport (`viewport-fit=cover`), `theme-color`, manifest + apple-touch-icon links, and a pre-paint script that applies the stored theme |
 | `dashboard/public/` | `favicon.svg`, PWA `manifest.webmanifest`, icons (`icon*.svg` sources → `icon-192/512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`), `sw.js` (app-shell service worker, never caches `/api`) |
 | `dashboard/scripts/render-icons.sh` | Regenerates the PNG icons from the SVG sources with headless Chrome |
+| `.claude/launch.json` | Browser-preview entries: `dashboard` (sample data), `dashboard+collector` |
+| `.env.example` | Every collector variable (sources, timings, retention prune) |
+| `docker-compose.yml` · `.dockerignore` | Collector (SQLite volume) + dashboard (nginx proxying `/api`) |
 | `docs/` | `architecture.md` (data flow, planned services) · `api.md` (HTTP contract) |
 
 ### dashboard/src
@@ -183,9 +194,40 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
 | `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `NotFound` |
 | `test/setup.ts` | jest-dom + in-memory localStorage (see gotchas) |
+| `../Dockerfile` · `../nginx/default.conf.template` | Dashboard image built with `VITE_USE_MOCKS=false`; nginx proxies `/api` to `NW_API_UPSTREAM` |
+
+### collector/src
+| Path | Contents |
+|---|---|
+| `index.ts` | Wiring only: config → store → scheduler + bus → HTTP; retention pruning timer |
+| `config.ts` | `loadConfig(env)` — every `NW_*` variable, validated; a source is off until its variable is set |
+| `contract.ts` · `sample.ts` | Re-export the dashboard's `api/types.ts` and `api/mock/data.ts` (never copied) |
+| `routes.ts` | **Every endpoint, one table** (`/health` + docs/api.md); add an endpoint here |
+| `server.ts` | Express app: routes under `/api`, `/health` at the root, `HttpError` → status + text |
+| `store.ts` | SQLite (`node:sqlite`): logs, checks, samples, heartbeat sources, incidents, key/value; `prune`, `usage` |
+| `duration.ts` | `parseDuration('14d')`, time ranges |
+| `sources/health.ts` | Heartbeat checker: `checkOnce`, `runHealthCheck` (logs + incidents) |
+| `sources/controlRoom.ts` | NexusInfra Control Room `/status` + `/uptime` poller |
+| `sources/prometheus.ts` | Text-format parser (kept series only) + scraper with counter rates and histogram p95 |
+| `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
+| `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
+| `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
+| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags) |
+| `contract.test.ts` | The mock invariants over HTTP, sample mode and live mode |
+| `../Dockerfile` · `../targets.example.json` | Collector image (repo-root context); example health-target list |
 
 ## 8. Conventions & gotchas
 
+- **The collector imports the dashboard's contract and sample data from source.** That is why it uses
+  `moduleResolution: Bundler` + `paths` (`@/` → `dashboard/src`) and runs via `node --import tsx`; its own
+  imports still carry `.js` extensions. Keep `api/mock/data.ts` free of browser-only APIs and
+  `import.meta.env` — the collector executes it in Node.
+- **A new endpoint needs a collector route** (`collector/src/routes.ts`) or `npm run dev` answers 404 for it;
+  until its source exists, the route returns the dashboard's sample generator. `npm run dev:mocks` skips the collector.
+- **The collector reads `NW_PORT`, not `PORT`** — tools (like the browser preview) export `PORT` for the dashboard.
+- **`node:sqlite` needs Node ≥ 22.13** (the Docker images use Node 22). No native module to build.
+- **Live series are never padded** with zeros: they start at the first measurement in the window, so
+  they can be shorter than the sample data's (see docs/api.md).
 - **Pages never import from `api/mock`.** They use `api/queries.ts`; only `endpoints.ts` knows mocks exist.
   If a page needs a field, add it to `types.ts`, the mock, and `docs/api.md` — together.
 - **Never hard-code a colour in a component.** Use the tokens (`var(--c-nx)` etc.) or `lib/status.ts`.

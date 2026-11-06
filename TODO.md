@@ -15,17 +15,34 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [x] Theme applied before first paint (no dark flash on reload in light mode) (#—)
 - [x] Tests: shell (tabs, More sheet, Escape, active tab, Logs sheets), `nav` helpers, `trapIndex` (#—)
 
+### `feature/collector` (local branch `claude/collector-fc695d`)
+- [x] `collector` workspace: Node/TS ESM, Express, `node:sqlite`; imports the dashboard's types + sample data from source (#—)
+- [x] Serve every endpoint of docs/api.md (+ the collector's own `/health`), sample data where no source is configured (#—)
+- [x] Heartbeat checker for configured `/health` targets: interval, timeout, slow threshold, `null` latency on failure, incidents (#—)
+- [x] Poll NexusInfra Control Room `/status` + `/uptime` (nodes, heartbeat sources, dead letters) (#—)
+- [x] Scrape Prometheus `/metrics`: request rate, 5xx rate, p95, dead letters, outbox, containers (#—)
+- [x] Consume `monitoring.heartbeat.#` from `finvault.events` via a `readPayload()` mirror, wire-compat test with a NexusInfra ciphertext (#—)
+- [x] Storage with retention per kind (logs / metrics / heartbeats) from the Settings options; stable stored log ids (#—)
+- [x] Contract tests: the `data.test.ts` invariants over HTTP, sample and live mode (#—)
+- [x] `collector/Dockerfile`, dashboard Dockerfile + nginx, `docker-compose.yml`, `.env.example`, `npm run dev` starts both (#—)
+- [x] `FinVaultService.rps` nullable (unmeasured is not 0) (#—)
+- [x] Docs: architecture, api (`/health`, live rules), CLAUDE.md, README (#—)
+
 ## Backlog
 
-### Backend (`feature/collector`)
-- [ ] Decide the collector stack (Node/TS to match NexusInfra is the default) and add a `collector` workspace (#—)
-- [ ] Serve the `/api` contract in docs/api.md from stored data, replacing the mocks endpoint by endpoint (#—)
-- [ ] Poll NexusInfra Control Room `/status` + `/uptime` and every service's `/health` (#—)
-- [ ] Consume `monitoring.heartbeat.#` from the `finvault.events` exchange via `readPayload()` (#—)
-- [ ] Scrape Prometheus `/metrics` from NexusInfra services (#—)
+### Backend (collector follow-ups)
 - [ ] Deliver notifications: Discord webhook, Telegram Bot API `sendMessage`, SMTP, ntfy — and the "Send test" button (#—)
-- [ ] Storage with retention per data kind (logs / metrics / heartbeats) (#—)
-- [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
+- [ ] Evaluate alert rules (today every open incident is an active alert; rules are the sample set + stored toggles) (#—)
+- [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
+- [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
+- [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
+- [ ] Alerts for heartbeat sources link to `/services/<source>`, which 404s for nodes — link nodes to Heartbeats instead (#—)
+- [ ] Charts: align a live series that is shorter than the window to the right of the time axis (#—)
+- [ ] Heartbeats card says "every 30 s" — show the configured interval from the API (#—)
+- [ ] Host card shows sample "nodes connected" when no node source is configured — say "no node source" instead (#—)
+- [ ] Build and run the Docker images end to end (compose validated, images not built yet: Docker daemon was off) (#—)
+- [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
+- [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
 
 ### Dashboard
 - [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
@@ -42,7 +59,6 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] `nexuswatch/agent` container from the Settings design: heartbeats, metrics, logs to the server (#—)
 
 ### Infra
-- [ ] Dockerfile + nginx for the dashboard (#—)
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done

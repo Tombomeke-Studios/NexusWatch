@@ -3,3 +3,5 @@ dist
 coverage
 .env
 *.local
+collector/data
+.claude/worktrees/
