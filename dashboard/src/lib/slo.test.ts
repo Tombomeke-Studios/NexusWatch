@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BURN_RULES, attainment, budgetRemaining, burnDown, burnRate, burnThreshold, errorBudgetMinutes, evaluateBurnAlerts,
-  remainingBudgetMinutes, sloState, sumTallies, tallyStatuses, timeToExhaustionMinutes,
+  remainingBudgetMinutes, sloState, sumTallies, summarizeSlo, tallyStatuses, timeToExhaustionMinutes,
 } from './slo';
 
 const T = (good: number, bad: number, unknown = 0) => ({ good, bad, unknown });
@@ -169,5 +169,39 @@ describe('sloState', () => {
     expect(sloState(0.1, [])).toBe('at-risk');
     expect(sloState(0.9, [{ id: 'slow' } as never])).toBe('at-risk');
     expect(sloState(0.9, [])).toBe('healthy');
+  });
+});
+
+describe('summarizeSlo', () => {
+  const tally = (good: number, bad: number, unknown = 0) => ({ good, bad, unknown });
+  const quietWindows = { '5m': tally(10, 0), '30m': tally(60, 0), '1h': tally(120, 0), '2h': tally(240, 0), '6h': tally(720, 0), '24h': tally(2880, 0) };
+  const base = {
+    id: 's', serviceId: 'svc', name: 'svc', project: 'finvault' as const, objective: '', targetPct: 99.9, windowDays: 30,
+    window: tally(1999, 1), daily: [tally(1000, 0), tally(999, 1)], burnWindows: quietWindows,
+  };
+
+  it('derives budget, burn and state from the tallies', () => {
+    const s = summarizeSlo(base);
+    expect(s.attainment).toBeCloseTo(99.95);
+    expect(s.remaining).toBeCloseTo(0.5);
+    expect(s.remainingMinutes).toBeCloseTo(21.6);
+    expect(s.burn['1h']).toBe(0);
+    expect(s.exhaustionMinutes).toBe(Infinity);
+    expect(s.burnDown).toHaveLength(2);
+    expect(s.state).toBe('healthy');
+  });
+
+  it('pages on a fast burn and estimates when the budget runs out', () => {
+    const s = summarizeSlo({ ...base, burnWindows: { ...quietWindows, '5m': tally(8, 2), '1h': tally(117, 3) } });
+    expect(s.alerts.map((a) => a.id)).toEqual(['fast']);
+    expect(s.state).toBe('at-risk');
+    // 21.6 min left at 25× on 99.9% → 0.025 bad minutes per minute → 864 min.
+    expect(s.exhaustionMinutes).toBeCloseTo(864);
+  });
+
+  it('stays unknown when there is no data at all', () => {
+    const empty = tally(0, 0, 100);
+    const s = summarizeSlo({ ...base, window: empty, daily: [empty], burnWindows: { '5m': empty, '30m': empty, '1h': empty, '2h': empty, '6h': empty, '24h': empty } });
+    expect(s).toMatchObject({ attainment: null, remaining: null, remainingMinutes: null, exhaustionMinutes: null, state: 'unknown', alerts: [], burnDown: [] });
   });
 });

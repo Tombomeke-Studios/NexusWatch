@@ -1,4 +1,6 @@
 import type { ChartColor, HealthStatus, LogLevel, ProjectId, Severity } from '@/api/types';
+import type { IncidentStatus, PublicStatus } from '@/api/types';
+import type { SloState } from './slo';
 
 /** Status → colour helpers shared by every page. The design's palette lives in tokens.css. */
 
@@ -90,3 +92,27 @@ export function meterColor(pct: number, base = 'var(--c-nx)'): string {
   if (pct > 70) return 'var(--c-warn)';
   return base;
 }
+
+// ── Reliability ─────────────────────────────────────────────────────────
+export const sloStatePill: Record<SloState, string> = { healthy: 'p-ok', 'at-risk': 'p-warn', breached: 'p-down', unknown: 'p-mute' };
+export const sloStateLabel: Record<SloState, string> = { healthy: 'on target', 'at-risk': 'at risk', breached: 'breached', unknown: 'no data' };
+/** Text colour for a budget or attainment figure in that state. */
+export const sloStateText: Record<SloState, string> = { healthy: 'var(--text)', 'at-risk': 'var(--warn)', breached: 'var(--down)', unknown: 'var(--muted)' };
+
+export const INCIDENT_STEPS: readonly IncidentStatus[] = ['investigating', 'identified', 'monitoring', 'resolved'];
+export const incidentStatusPill: Record<IncidentStatus, string> = { investigating: 'p-down', identified: 'p-warn', monitoring: 'p-info', resolved: 'p-ok' };
+export const incidentStatusLabel: Record<IncidentStatus, string> = { investigating: 'Investigating', identified: 'Identified', monitoring: 'Monitoring', resolved: 'Resolved' };
+
+export const publicStatusLabel: Record<PublicStatus, string> = {
+  operational: 'Operational', degraded: 'Degraded performance', 'partial-outage': 'Partial outage', 'major-outage': 'Major outage', maintenance: 'Under maintenance',
+};
+/** The banner sentence for the overall status. */
+export const publicStatusHeadline: Record<PublicStatus, string> = {
+  operational: 'All systems operational', degraded: 'Some systems are slower than usual', 'partial-outage': 'Some systems are down',
+  'major-outage': 'Major outage', maintenance: 'Scheduled maintenance in progress',
+};
+export const publicStatusPill: Record<PublicStatus, string> = { operational: 'p-ok', degraded: 'p-warn', 'partial-outage': 'p-down', 'major-outage': 'p-down', maintenance: 'p-info' };
+/** Fill colour (marks, dots, banner edge). */
+export const publicStatusColor: Record<PublicStatus, string> = {
+  operational: 'var(--c-ok)', degraded: 'var(--c-warn)', 'partial-outage': 'var(--c-down)', 'major-outage': 'var(--c-down)', maintenance: 'var(--c-nx)',
+};

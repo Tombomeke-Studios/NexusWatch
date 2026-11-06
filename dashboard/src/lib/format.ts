@@ -67,3 +67,25 @@ export function formatBytes(bytes: number): string {
   if (mb < 1024) return `${Math.round(mb)} MB`;
   return `${formatNumber(mb / 1024, 1)} GB`;
 }
+
+/** Burn rate as a multiple, e.g. `14.4×`; `no data` when unknown. */
+export function formatBurn(rate: number | null): string {
+  if (rate === null) return 'no data';
+  return `${rate >= 100 ? Math.round(rate) : Number(rate.toFixed(1))}×`;
+}
+
+/** Error budget in minutes, signed when overspent: `21.6 min`, `-33 min`; `no data` when unknown. */
+export function formatBudgetMinutes(minutes: number | null): string {
+  if (minutes === null) return 'no data';
+  const abs = Math.abs(minutes);
+  const text = abs >= 100 ? formatDuration(abs * 60) : `${Number(abs.toFixed(1))} min`;
+  return minutes < 0 ? `-${text}` : text;
+}
+
+/** Time until an error budget runs out: `never`, `exhausted`, `6h 4m`; `no data` when unknown. */
+export function formatExhaustion(minutes: number | null): string {
+  if (minutes === null) return 'no data';
+  if (minutes === Infinity) return 'never';
+  if (minutes <= 0) return 'exhausted';
+  return formatDuration(minutes * 60);
+}

@@ -5,7 +5,7 @@
  * availability SLO), `bad` (failed) and `unknown` (no data: agent offline, collector gap).
  * Unknown checks are excluded from every calculation — never counted as up, never as down.
  */
-import type { BurnWindow, CheckTally, HealthStatus, Severity } from '@/api/types';
+import type { BurnWindow, CheckTally, HealthStatus, Severity, Slo } from '@/api/types';
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -148,4 +148,38 @@ export function sloState(remaining: number | null, alerts: readonly BurnAlert[])
   if (remaining < 0) return 'breached';
   if (remaining < 0.25 || alerts.length > 0) return 'at-risk';
   return 'healthy';
+}
+
+const BURN_WINDOWS: readonly BurnWindow[] = ['5m', '30m', '1h', '2h', '6h', '24h'];
+
+export interface SloSummary {
+  attainment: number | null;
+  budgetMinutes: number;
+  remaining: number | null;
+  remainingMinutes: number | null;
+  burn: Record<BurnWindow, number | null>;
+  alerts: BurnAlert[];
+  /** At the 1h burn rate. */
+  exhaustionMinutes: number | null;
+  burnDown: number[];
+  state: SloState;
+}
+
+/** Everything a page shows about one SLO, derived from its tallies. */
+export function summarizeSlo(slo: Slo): SloSummary {
+  const burn = Object.fromEntries(BURN_WINDOWS.map((w) => [w, burnRate(slo.targetPct, slo.burnWindows[w])])) as Record<BurnWindow, number | null>;
+  const alerts = evaluateBurnAlerts(burn, slo.windowDays);
+  const remaining = budgetRemaining(slo.targetPct, slo.window);
+  const remainingMinutes = remainingBudgetMinutes(slo.targetPct, slo.windowDays, slo.window);
+  return {
+    attainment: attainment(slo.window),
+    budgetMinutes: errorBudgetMinutes(slo.targetPct, slo.windowDays),
+    remaining,
+    remainingMinutes,
+    burn,
+    alerts,
+    exhaustionMinutes: timeToExhaustionMinutes(remainingMinutes, burn['1h'], slo.targetPct),
+    burnDown: burnDown(slo.targetPct, slo.daily),
+    state: sloState(remaining, alerts),
+  };
 }
