@@ -1,0 +1,29 @@
+# NexusWatch: collector + dashboard. `docker compose up --build`, then http://localhost:8088
+# Point the collector at a NexusInfra/FinVault stack with the variables in .env.example
+# (put them in .env next to this file).
+services:
+  collector:
+    build: { context: ., dockerfile: collector/Dockerfile }
+    container_name: nexuswatch-collector
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NW_PORT: 8080
+      NW_DB_PATH: /data/nexuswatch.db
+    volumes:
+      - nexuswatch-data:/data
+    ports: ['${NW_COLLECTOR_PORT:-8080}:8080']
+    restart: unless-stopped
+
+  dashboard:
+    build: { context: ., dockerfile: dashboard/Dockerfile }
+    container_name: nexuswatch-dashboard
+    environment:
+      NW_API_UPSTREAM: http://collector:8080
+    depends_on: [collector]
+    ports: ['${NW_DASHBOARD_PORT:-8088}:80']
+    restart: unless-stopped
+
+volumes:
+  nexuswatch-data:
