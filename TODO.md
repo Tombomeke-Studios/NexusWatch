@@ -4,7 +4,16 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-_(no active branch)_
+### `feature/mobile` — ready for review (not merged)
+- [x] Shared nav config (`nav.ts`) for the sidebar and the mobile shell (#—)
+- [x] Mobile shell below 820px: top bar (logo, title, alert badge) + bottom tab bar with a "More" sheet (#—)
+- [x] `Sheet`: focus trap, Escape/backdrop close, inert page, focus return, safe-area insets (#—)
+- [x] Every page usable at 390px without horizontal scroll (measured on every route at 390 and 768) (#—)
+- [x] `.tbl` rows become stacked cards with `data-label` captions; segmented controls scroll; 44px touch targets (#—)
+- [x] Logs: facets in a filter sheet, a tapped line opens its document full-screen (#—)
+- [x] PWA: manifest, icons from the logo, apple-touch-icon, `theme-color` per theme, app-shell service worker (#—)
+- [x] Theme applied before first paint (no dark flash on reload in light mode) (#—)
+- [x] Tests: shell (tabs, More sheet, Escape, active tab, Logs sheets), `nav` helpers, `trapIndex` (#—)
 
 ## Backlog
 
@@ -22,7 +31,9 @@ _(no active branch)_
 - [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
 - [ ] Wire the "Coming soon" actions: add monitor, new rule, mute, test check, rotate agent token, send test notification (#—)
 - [ ] Time range actually changes query windows once the API supports it (#—)
-- [ ] Narrow-screen pass: collapsible sidebar below 820px (#—)
+- [ ] Alerts tables: add `data-label` captions (left to `feature/alert-rules`, which rewrites that page) (#—)
+- [ ] Offline banner when the service worker serves the cached shell and `/api` is unreachable (#—)
+- [ ] Web push for alerts on the installed PWA (needs the backend's notification delivery) (#—)
 - [ ] Accessibility pass with axe in both themes (#—)
 - [ ] Overview "Recent events": make events clickable the same way as service logs (#—)
 - [ ] Code-split pages (bundle is 444 kB before gzip) (#—)
