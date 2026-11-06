@@ -161,10 +161,13 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `api/endpoints.ts` | `api.*` — every backend call; each picks mock or HTTP from `config.useMocks` |
 | `api/queries.ts` | React Query hooks (`useOverview`, `useLogs`, …) + mutations. **Pages read data only through these.** Live views poll every `VITE_REFRESH_MS` |
 | `api/mock/data.ts` | Sample data ported from the design, seeded so it is stable; timestamps relative to now; in-memory state for toggles/acks |
+| `api/mock/reliability.ts` | Sample SLO tallies, the in-memory incident store (create / update / resolve; Heartbeats lists the same incidents) and the public status page. Reads `services` from `data.ts` only inside functions — the two modules import each other |
 | `lib/series.ts` | Pure chart maths: `rng`, `walk`, `linePath`, `areaPath`, `stats`, `barHeights` |
 | `lib/format.ts` | Display formatting: euros, percent, latency (`timeout` for null), durations, bytes, `formatClock`, `formatWhen` |
 | `lib/status.ts` | Status/level/severity/project → colour, pill class and label maps |
 | `lib/ranges.ts` | Time-range options + relative axis labels |
+| `lib/slo.ts` | SLO maths: attainment, error budget, burn rate, time to exhaustion, burn-down, multi-window burn alerts (`BURN_RULES`), `summarizeSlo` |
+| `lib/publicStatus.ts` | Public status roll-up: health → public status, worst of a group, overall banner |
 | `lib/config.ts` | Typed Vite env (`useMocks`, `apiBase`, `refreshMs`) |
 | `components/layout/` | `AppShell` (background + sidebar + outlet), `Sidebar` (nav, alert badge, host card), `Logo` |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
@@ -173,8 +176,10 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/ui/QueryState.tsx` | Loading skeleton / error (404 → "Nothing here") / `children(data)` for any query |
 | `components/ui/Icon.tsx` | The design's stroke icons by name |
 | `components/NodeCard.tsx` | Node with CPU/memory/disk meters (Heartbeats + NexusInfra) |
+| `components/SloCard.tsx` | A service's SLO in one small card (Service detail), linking to its burn-down on `/slo?service=…` |
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
-| `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `NotFound` |
+| `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `Slo` (`/slo`), `Incidents` + `IncidentDetail` (`/incidents/:incidentId`), `StatusPage` (`/status`, outside the shell), `NotFound` |
+| `styles/reliability.css` | Classes for the SLO, incident and status pages (forms, lifecycle steps, update timeline, `.sp` status layout). Imported by those pages, not by `main.tsx` |
 | `test/setup.ts` | jest-dom + in-memory localStorage (see gotchas) |
 
 ## 8. Conventions & gotchas
@@ -189,6 +194,11 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   a missing measurement must never be drawn as 0.
 - **A log entry's `id` must be stable** across polls and endpoints — deep links (`/logs?entry=…`) and the
   selected/unfolded line depend on it. The mock derives it from the line's content; the backend must use a stored id.
+- **SLO maths runs in the dashboard, from raw check tallies** (`lib/slo.ts`). `unknown` checks are excluded from
+  every SLO figure; `slow` counts as good (availability objective). A missing burn window never fires an alert.
+- **`/status` is public.** It sits outside `AppShell`, reads only `useStatusPage()`, and its types (`StatusPageData`)
+  must never gain a host, address, port, target, node or internal id — `reliability.test.ts` checks the type and the
+  response. Incidents show there only with `public: true`, under `publicTitle`, with public updates only.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in
   `queries.ts`; never call `fetch` from a page.
