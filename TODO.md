@@ -4,58 +4,7 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-### `feature/mobile` — ready for review (not merged)
-- [x] Shared nav config (`nav.ts`) for the sidebar and the mobile shell (#—)
-- [x] Mobile shell below 820px: top bar (logo, title, alert badge) + bottom tab bar with a "More" sheet (#—)
-- [x] `Sheet`: focus trap, Escape/backdrop close, inert page, focus return, safe-area insets (#—)
-- [x] Every page usable at 390px without horizontal scroll (measured on every route at 390 and 768) (#—)
-- [x] `.tbl` rows become stacked cards with `data-label` captions; segmented controls scroll; 44px touch targets (#—)
-- [x] Logs: facets in a filter sheet, a tapped line opens its document full-screen (#—)
-- [x] PWA: manifest, icons from the logo, apple-touch-icon, `theme-color` per theme, app-shell service worker (#—)
-- [x] Theme applied before first paint (no dark flash on reload in light mode) (#—)
-- [x] Tests: shell (tabs, More sheet, Escape, active tab, Logs sheets), `nav` helpers, `trapIndex` (#—)
-
-### `feature/collector` (local branch `claude/collector-fc695d`)
-- [x] `collector` workspace: Node/TS ESM, Express, `node:sqlite`; imports the dashboard's types + sample data from source (#—)
-- [x] Serve every endpoint of docs/api.md (+ the collector's own `/health`), sample data where no source is configured (#—)
-- [x] Heartbeat checker for configured `/health` targets: interval, timeout, slow threshold, `null` latency on failure, incidents (#—)
-- [x] Poll NexusInfra Control Room `/status` + `/uptime` (nodes, heartbeat sources, dead letters) (#—)
-- [x] Scrape Prometheus `/metrics`: request rate, 5xx rate, p95, dead letters, outbox, containers (#—)
-- [x] Consume `monitoring.heartbeat.#` from `finvault.events` via a `readPayload()` mirror, wire-compat test with a NexusInfra ciphertext (#—)
-- [x] Storage with retention per kind (logs / metrics / heartbeats) from the Settings options; stable stored log ids (#—)
-- [x] Contract tests: the `data.test.ts` invariants over HTTP, sample and live mode (#—)
-- [x] `collector/Dockerfile`, dashboard Dockerfile + nginx, `docker-compose.yml`, `.env.example`, `npm run dev` starts both (#—)
-- [x] `FinVaultService.rps` nullable (unmeasured is not 0) (#—)
-- [x] Docs: architecture, api (`/health`, live rules), CLAUDE.md, README (#—)
-
-### `feature/status-slo` — local, not merged
-- [x] SLO maths in `lib/slo.ts`: budget, burn rate, time to exhaustion, burn-down, multi-window burn alerts; unknown checks excluded (#—)
-- [x] `/slo` page: per-service target, attainment, budget left, burn 1h/6h/24h, burn alerts, burn-down chart (#—)
-- [x] SLO card on Service detail (#—)
-- [x] Incidents: `/incidents` + `/incidents/:id` with lifecycle, update timeline, affected services, duration, postmortem (#—)
-- [x] Mock mutations: declare incident, post update, resolve (with postmortem) (#—)
-- [x] Heartbeats' incident list links to the incident pages (same store) (#—)
-- [x] Public `/status` page outside the shell: banner, component groups with 90-day bars, active + recent incidents, maintenance (#—)
-- [x] `StatusPageData` public-safe types + test that no host/port/IP/id leaks (#—)
-- [x] Contract (types, endpoints, hooks, mocks, docs/api.md), route tests, mock contract tests (#—)
-
-### `feature/business-insights`
-- [x] Pure top-up reconciliation rules with tests: confirmed not credited, credited twice, amount mismatch, stuck past `TOPUP_TIMEOUT_MS`, late confirmation (#298), credit without confirmation (#—)
-- [x] Business contract (`GET /business`): top-ups as both sides recorded them, standing, suspensions, revenue per plan, bus health — types, mock, docs/api.md (#—)
-- [x] Seeded sample data with every anomaly, plus mock contract tests (masked payers, null = unknown) (#—)
-- [x] Business page: reconciliation KPIs, anomalies, pipeline with filter; credit and standing; event bus (throughput, DLQ, outbox, consumers) (#—)
-- [x] Nav entry under Projects; links to and from the FinVault and NexusInfra pages (#—)
-
-### `feature/alert-rules` — branch finished, waiting for a merge go-ahead
-- [x] `lib/rules.ts`: parse/format/validate conditions, durations, evaluation (unknown ≠ 0), silences, maintenance windows, escalation progress, history filter — with tests (#—)
-- [x] Contract: structured rule conditions, silences, maintenance windows, escalation policies, notes, rule test; mock + `docs/api.md` + mock contract tests (#—)
-- [x] Accessible `Dialog` / `ConfirmDialog` primitive (focus trap, Escape, focus returns to the opener) (#—)
-- [x] Rule editor: create, edit, duplicate, delete (confirm, Cancel focused), live validation, condition preview, test against current data (#—)
-- [x] Mute an alert or rule for 15m/1h/4h/until resolved with a reason; Muted KPI; silences list with countdown and unmute (#—)
-- [x] Maintenance windows per project or service, optionally weekly; alerts inside are labelled and suppressed (#—)
-- [x] Escalation policies: editable ordered steps, progress shown on each active alert (#—)
-- [x] History: project/severity/status filters, acknowledge/resolve notes (#—)
-- [x] UI tests for the dialogs and alerting flows; browser-checked in both themes and at 390px (#—)
+_(no active branch)_
 
 ## Backlog
 
@@ -113,6 +62,59 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
+### `feature/mobile` — merged into `dev`
+- [x] Shared nav config (`nav.ts`) for the sidebar and the mobile shell (#—)
+- [x] Mobile shell below 820px: top bar (logo, title, alert badge) + bottom tab bar with a "More" sheet (#—)
+- [x] `Sheet`: focus trap, Escape/backdrop close, inert page, focus return, safe-area insets (#—)
+- [x] Every page usable at 390px without horizontal scroll (measured on every route at 390 and 768) (#—)
+- [x] `.tbl` rows become stacked cards with `data-label` captions; segmented controls scroll; 44px touch targets (#—)
+- [x] Logs: facets in a filter sheet, a tapped line opens its document full-screen (#—)
+- [x] PWA: manifest, icons from the logo, apple-touch-icon, `theme-color` per theme, app-shell service worker (#—)
+- [x] Theme applied before first paint (no dark flash on reload in light mode) (#—)
+- [x] Tests: shell (tabs, More sheet, Escape, active tab, Logs sheets), `nav` helpers, `trapIndex` (#—)
+
+### `feature/collector` — merged into `dev`
+- [x] `collector` workspace: Node/TS ESM, Express, `node:sqlite`; imports the dashboard's types + sample data from source (#—)
+- [x] Serve every endpoint of docs/api.md (+ the collector's own `/health`), sample data where no source is configured (#—)
+- [x] Heartbeat checker for configured `/health` targets: interval, timeout, slow threshold, `null` latency on failure, incidents (#—)
+- [x] Poll NexusInfra Control Room `/status` + `/uptime` (nodes, heartbeat sources, dead letters) (#—)
+- [x] Scrape Prometheus `/metrics`: request rate, 5xx rate, p95, dead letters, outbox, containers (#—)
+- [x] Consume `monitoring.heartbeat.#` from `finvault.events` via a `readPayload()` mirror, wire-compat test with a NexusInfra ciphertext (#—)
+- [x] Storage with retention per kind (logs / metrics / heartbeats) from the Settings options; stable stored log ids (#—)
+- [x] Contract tests: the `data.test.ts` invariants over HTTP, sample and live mode (#—)
+- [x] `collector/Dockerfile`, dashboard Dockerfile + nginx, `docker-compose.yml`, `.env.example`, `npm run dev` starts both (#—)
+- [x] `FinVaultService.rps` nullable (unmeasured is not 0) (#—)
+- [x] Docs: architecture, api (`/health`, live rules), CLAUDE.md, README (#—)
+
+### `feature/status-slo` — merged into `dev`
+- [x] SLO maths in `lib/slo.ts`: budget, burn rate, time to exhaustion, burn-down, multi-window burn alerts; unknown checks excluded (#—)
+- [x] `/slo` page: per-service target, attainment, budget left, burn 1h/6h/24h, burn alerts, burn-down chart (#—)
+- [x] SLO card on Service detail (#—)
+- [x] Incidents: `/incidents` + `/incidents/:id` with lifecycle, update timeline, affected services, duration, postmortem (#—)
+- [x] Mock mutations: declare incident, post update, resolve (with postmortem) (#—)
+- [x] Heartbeats' incident list links to the incident pages (same store) (#—)
+- [x] Public `/status` page outside the shell: banner, component groups with 90-day bars, active + recent incidents, maintenance (#—)
+- [x] `StatusPageData` public-safe types + test that no host/port/IP/id leaks (#—)
+- [x] Contract (types, endpoints, hooks, mocks, docs/api.md), route tests, mock contract tests (#—)
+
+### `feature/business-insights` — merged into `dev`
+- [x] Pure top-up reconciliation rules with tests: confirmed not credited, credited twice, amount mismatch, stuck past `TOPUP_TIMEOUT_MS`, late confirmation (#298), credit without confirmation (#—)
+- [x] Business contract (`GET /business`): top-ups as both sides recorded them, standing, suspensions, revenue per plan, bus health — types, mock, docs/api.md (#—)
+- [x] Seeded sample data with every anomaly, plus mock contract tests (masked payers, null = unknown) (#—)
+- [x] Business page: reconciliation KPIs, anomalies, pipeline with filter; credit and standing; event bus (throughput, DLQ, outbox, consumers) (#—)
+- [x] Nav entry under Projects; links to and from the FinVault and NexusInfra pages (#—)
+
+### `feature/alert-rules` — merged into `dev`
+- [x] `lib/rules.ts`: parse/format/validate conditions, durations, evaluation (unknown ≠ 0), silences, maintenance windows, escalation progress, history filter — with tests (#—)
+- [x] Contract: structured rule conditions, silences, maintenance windows, escalation policies, notes, rule test; mock + `docs/api.md` + mock contract tests (#—)
+- [x] Accessible `Dialog` / `ConfirmDialog` primitive (focus trap, Escape, focus returns to the opener) (#—)
+- [x] Rule editor: create, edit, duplicate, delete (confirm, Cancel focused), live validation, condition preview, test against current data (#—)
+- [x] Mute an alert or rule for 15m/1h/4h/until resolved with a reason; Muted KPI; silences list with countdown and unmute (#—)
+- [x] Maintenance windows per project or service, optionally weekly; alerts inside are labelled and suppressed (#—)
+- [x] Escalation policies: editable ordered steps, progress shown on each active alert (#—)
+- [x] History: project/severity/status filters, acknowledge/resolve notes (#—)
+- [x] UI tests for the dialogs and alerting flows; browser-checked in both themes and at 390px (#—)
+
 ### `feature/telegram-channel` — merged into `dev`
 - [x] Telegram as a notification channel: settings list, routing column, API contract (#—)
 
