@@ -221,7 +221,7 @@ export function PolicyEditor({ policy, onClose }: { policy: EscalationPolicy | n
         <Field id={`${id}-name`} label="Name" error={nameError}>
           <input className="inp" {...fieldProps(`${id}-name`, nameError)} value={name} maxLength={60} placeholder="On-call" onChange={(e) => setName(e.target.value)} />
         </Field>
-        <fieldset className="fld" style={{ flex: 'none' }}>
+        <fieldset className="fld">
           <legend>Steps</legend>
           <ol className="steps-edit">
             {steps.map((s, i) => (

@@ -236,8 +236,8 @@ export function MaintenancePanel({ data }: { data: AlertsData }) {
                     <span style={{ fontWeight: 600 }}>{w.title}</span>
                     <Pill tone={status.tone}>{status.text}</Pill>
                   </div>
-                  <div className="muted small" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                    <Swatch color={projectColor[w.project]} />
+                  <div className="muted small">
+                    <Swatch color={projectColor[w.project]} style={{ display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
                     {projectName[w.project]} · {service ? service.name : 'whole project'} ·{' '}
                     {w.recurrence === 'weekly' ? `every ${formatWeekly(w.startsAt)}` : formatWhen(w.startsAt)} for {formatSpan(w.durationMinutes * 60)}
                   </div>

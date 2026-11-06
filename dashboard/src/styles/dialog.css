@@ -19,8 +19,9 @@
 
 /* Form fields */
 .frow { display: flex; flex-wrap: wrap; gap: 12px; }
-.fld { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 200px; margin: 0; padding: 0; border: 0; }
-.fld.narrow { flex: 1 1 110px; }
+.fld { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.frow > .fld { flex: 1 1 200px; }
+.frow > .fld.narrow { flex: 1 1 110px; }
 .fld > label, .fld > legend, .fld .fl { font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 0; }
 .fld .err { color: var(--down); font-size: 12.5px; }
 .fld .hint { color: var(--subtle); font-size: 12px; }

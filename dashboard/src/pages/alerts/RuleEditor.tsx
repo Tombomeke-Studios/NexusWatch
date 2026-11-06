@@ -123,7 +123,7 @@ export function RuleEditor({ mode, policies, onClose, onModeChange }: {
       <form id={`${id}-form`} noValidate onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="frow">
           <Field id={fid('name')} label="Name" error={show('name')}>
-            <input ref={nameRef} className="inp" {...fieldProps(fid('name'), show('name'))} value={draft.name} maxLength={80} autoComplete="off" onChange={(e) => set('name', e.target.value, 'name')} onBlur={() => setTouched((t) => new Set(t).add('name'))} />
+            <input ref={nameRef} className="inp" {...fieldProps(fid('name'), show('name'))} value={draft.name} maxLength={80} autoComplete="off" onChange={(e) => set('name', e.target.value, 'name')} />
           </Field>
           <Field id={fid('project')} label="Project" narrow>
             <select className="inp" id={fid('project')} value={draft.project} onChange={(e) => setProject(e.target.value as ProjectId)}>
@@ -155,14 +155,14 @@ export function RuleEditor({ mode, policies, onClose, onModeChange }: {
           </Field>
         </div>
 
-        <div className="fld" style={{ flex: 'none' }}>
+        <div className="fld">
           <span className="fl" id={fid('severity')}>Severity</span>
           <div style={{ alignSelf: 'flex-start' }}>
             <Segmented small label="Severity" options={SEVERITIES} value={draft.severity} onChange={(v) => set('severity', v)} />
           </div>
         </div>
 
-        <fieldset className="fld" style={{ flex: 'none' }} aria-describedby={show('channels') ? fid('channels') + '-err' : undefined}>
+        <fieldset className="fld" aria-describedby={show('channels') ? fid('channels') + '-err' : undefined}>
           <legend>Notify at once</legend>
           <div className="ckls" id={fid('channels')} tabIndex={-1}>
             {channels.map((c) => (
