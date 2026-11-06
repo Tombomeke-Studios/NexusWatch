@@ -67,9 +67,9 @@ export function HeartbeatsPage() {
             </Card>
 
             <Card padded labelledBy="inc">
-              <h2 className="h" id="inc" style={{ marginBottom: 12 }}>Incidents</h2>
+              <CardHeader flat id="inc" title="Incidents" link={{ to: routes.incidents, label: 'All incidents' }} />
               {data.incidents.map((i) => (
-                <div key={i.id} style={{ display: 'flex', gap: 14, padding: '12px 0', borderTop: '1px solid var(--surface2)' }}>
+                <Link key={i.id} to={routes.incident(i.id)} className="mrow" style={{ flexDirection: 'row', gap: 14, padding: '12px 0', borderTop: '1px solid var(--surface2)', borderBottom: 0 }}>
                   <Pill tone={i.open ? severityPill[i.severity] : 'p-ok'} style={{ height: 'fit-content', marginTop: 2 }}>{i.open ? 'open' : 'resolved'}</Pill>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600 }}>{i.title}</div>
@@ -80,7 +80,7 @@ export function HeartbeatsPage() {
                     <br />
                     {i.open ? `ongoing ${formatDuration(i.durationSeconds)}` : formatDuration(i.durationSeconds)}
                   </div>
-                </div>
+                </Link>
               ))}
             </Card>
           </>

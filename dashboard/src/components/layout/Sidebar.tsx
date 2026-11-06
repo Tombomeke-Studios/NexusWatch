@@ -12,6 +12,8 @@ const MAIN_NAV: { to: string; label: string; icon: IconName; end?: boolean }[] =
   { to: routes.logs, label: 'Logs', icon: 'logs' },
   { to: routes.metrics, label: 'Metrics', icon: 'metrics' },
   { to: routes.alerts, label: 'Alerts', icon: 'alerts' },
+  { to: routes.slo, label: 'SLOs', icon: 'slo' },
+  { to: routes.incidents, label: 'Incidents', icon: 'incident' },
 ];
 
 const navClass = ({ isActive }: { isActive: boolean }) => `nav${isActive ? ' active' : ''}`;

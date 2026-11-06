@@ -12,4 +12,11 @@ export const routes = {
   service: (id: string) => `/services/${encodeURIComponent(id)}`,
   project: (id: ProjectId) => `/projects/${id}`,
   settings: '/settings',
+  slo: '/slo',
+  /** SLOs with one service's burn-down selected. */
+  sloFor: (serviceId: string) => `/slo?${new URLSearchParams({ service: serviceId })}`,
+  incidents: '/incidents',
+  incident: (id: string) => `/incidents/${encodeURIComponent(id)}`,
+  /** Public, shareable status page — rendered without the app shell. */
+  status: '/status',
 } as const;
