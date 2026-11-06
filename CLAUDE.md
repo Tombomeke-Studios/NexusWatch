@@ -224,7 +224,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
 | `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
-| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags) |
+| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business, SLOs, incidents, `/status` and the alerting writes — sample generators only, state in memory, not SQLite) |
 | `contract.test.ts` | The mock invariants over HTTP, sample mode and live mode |
 | `../Dockerfile` · `../targets.example.json` | Collector image (repo-root context); example health-target list |
 
@@ -255,6 +255,11 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 - **`/status` is public.** It sits outside `AppShell`, reads only `useStatusPage()`, and its types (`StatusPageData`)
   must never gain a host, address, port, target, node or internal id — `reliability.test.ts` checks the type and the
   response. Incidents show there only with `public: true`, under `publicTitle`, with public updates only.
+- **A new endpoint is not done until the collector serves it.** Add it to `endpoints.ts` *and* to
+  `collector/src/routes.ts` (at least via `views/sampled.ts`), plus the path to the read-endpoint list
+  in `collector/src/contract.test.ts` — otherwise the page 404s with `VITE_USE_MOCKS=false`.
+- **Mocks signal errors with `ApiError(status)`, never a bare `Error`.** The collector passes the status
+  through; a bare `Error` becomes a 500 instead of the 404/409/400 that docs/api.md promises.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in
   `queries.ts`; never call `fetch` from a page.

@@ -10,7 +10,7 @@ export function createApp(ctx: Ctx) {
 
   const api = express.Router();
   for (const route of routes) {
-    const method = route.method.toLowerCase() as 'get' | 'post' | 'patch';
+    const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
     api[method](route.path, (req: Request, res: Response) => {
       const result = route.handle(ctx, {
         params: req.params as Record<string, string>,
@@ -36,7 +36,7 @@ export function createApp(ctx: Ctx) {
       res.status(err.status).type('text/plain').send(err.message);
       return;
     }
-    // A malformed JSON body arrives here from express.json().
+    // A malformed JSON body (express.json()) or a sample mutation's ApiError (404/409/400) arrives here.
     const status = (err as { status?: number }).status;
     if (status && status >= 400 && status < 500) {
       res.status(status).type('text/plain').send(err instanceof Error ? err.message : 'Bad request');
