@@ -386,3 +386,13 @@ export function filterHistory(items: AlertHistoryItem[], f: HistoryFilter): Aler
       (f.state === 'all' || (f.state === 'open') === h.open),
   );
 }
+
+/** A measured value as shown in test results: `78%`, `140 ms`, `down`; null is `no answer`. */
+export function formatMetricValue(metric: RuleMetric, value: number | null): string {
+  if (value === null) return 'no answer';
+  const m = METRICS[metric];
+  if (metric === 'heartbeat') return value === 1 ? 'up (1)' : 'down (0)';
+  if (m.unit === '%') return `${formatNumber(value)}%`;
+  if (m.unit === 'ms') return `${formatNumber(value)} ms`;
+  return formatNumber(value);
+}

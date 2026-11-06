@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AlertHistoryItem, AlertRule, EscalationPolicy, MaintenanceWindow, RuleCondition } from '@/api/types';
 import {
-  compare, draftCondition, draftFromRule, emptyDraft, escalationProgress, evaluateReading, evaluateRule, filterHistory,
+  compare, draftCondition, draftFromRule, formatMetricValue, emptyDraft, escalationProgress, evaluateReading, evaluateRule, filterHistory,
   formatCondition, formatCountdown, formatPolicy, formatSpan, isHttpUrl, isWindowActive, metricsFor, parseCondition,
   parseDuration, remainingSeconds, silenceEndsAt, validateDraft, validatePolicy, validateReason, validateWindow,
   windowCovers, windowOccurrence, type Reading,
@@ -264,5 +264,15 @@ describe('history filter', () => {
     expect(ids({ project: 'all', severity: 'warning', state: 'resolved' })).toEqual(['b', 'c']);
     expect(ids({ project: 'finvault', severity: 'all', state: 'open' })).toEqual(['a']);
     expect(ids({ project: 'nexusinfra', severity: 'critical', state: 'all' })).toEqual([]);
+  });
+});
+
+describe('formatMetricValue', () => {
+  it('shows a value with its unit, and unknown as "no answer"', () => {
+    expect(formatMetricValue('cpu', 78)).toBe('78%');
+    expect(formatMetricValue('latency', 140)).toBe('140 ms');
+    expect(formatMetricValue('heartbeat', 0)).toBe('down (0)');
+    expect(formatMetricValue('queue_depth', 42)).toBe('42');
+    expect(formatMetricValue('latency', null)).toBe('no answer');
   });
 });
