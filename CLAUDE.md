@@ -166,15 +166,19 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/status.ts` | Status/level/severity/project → colour, pill class and label maps |
 | `lib/ranges.ts` | Time-range options + relative axis labels |
 | `lib/config.ts` | Typed Vite env (`useMocks`, `apiBase`, `refreshMs`) |
+| `lib/rules.ts` | Pure alerting logic: `METRICS`, parse/format/validate rule conditions and durations, `evaluateReading`/`evaluateRule`, rule drafts (editor state), silences, maintenance windows, `escalationProgress`, `filterHistory` |
+| `lib/useNow.ts` | `useNow(ms)` — ticking clock for countdowns |
 | `components/layout/` | `AppShell` (background + sidebar + outlet), `Sidebar` (nav, alert badge, host card), `Logo` |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
 | `components/ui/primitives.tsx` | `Pill`, `StatusDot`, `Swatch`, `Segmented`, `Switch`, `Kpi`, `PageHeader` |
 | `components/ui/charts.tsx` | `LineChart`, `Sparkline`, `BarChart`, `StatusStrip`, `Meter`, `StackBar`, `Legend`, `XAxis` — plain SVG/CSS, no chart library |
 | `components/ui/QueryState.tsx` | Loading skeleton / error (404 → "Nothing here") / `children(data)` for any query |
 | `components/ui/Icon.tsx` | The design's stroke icons by name |
+| `components/ui/Dialog.tsx` | `Dialog` (portal, focus trap, Escape, focus back to the opener, scroll lock) + `ConfirmDialog` (Cancel focused). Styles in `styles/dialog.css`, which also holds the form-field classes (`.fld`, `.frow`, `.ckl`, `.form-err`) |
 | `components/NodeCard.tsx` | Node with CPU/memory/disk meters (Heartbeats + NexusInfra) |
 | `components/LogDocument.tsx` | A log line's full structured document as JSON, with a link to its service or to the line in the log stream. Used by Logs (selected line) and Service detail (click a line to unfold it) |
 | `pages/` | `Overview`, `Metrics`, `Logs`, `Heartbeats`, `Alerts`, `ServiceDetail` (`/services/:serviceId`), `projects/NexusInfra`, `projects/FinVault`, `Settings`, `NotFound` |
+| `pages/alerts/` | Alerts page parts: `panels.tsx` (Active, Rules, Silences, Maintenance, Escalation, History tabs), `RuleEditor.tsx`, `dialogs.tsx` (mute, ack/resolve note, maintenance, escalation policy), `shared.tsx` (`Field`, `useChannels`). Page styles in `styles/alerts.css` |
 | `test/setup.ts` | jest-dom + in-memory localStorage (see gotchas) |
 
 ## 8. Conventions & gotchas
@@ -198,3 +202,13 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 - **Nothing absolutely positioned inside a scrolling card unless the card is `position: relative`**
   (`.box` is). A `.sr-only` label that escapes its card makes the whole page scroll sideways on a phone.
 - Keep the class names in `app.css` aligned with the design files so a design change maps 1:1.
+- **Rule conditions are structured** (`metric`, `comparator`, `threshold`, `forSeconds`), never a free-text
+  string. Render them with `formatCondition`; the editor's form state is a `RuleDraft` and only
+  `validateDraft` turns it into an API body. The mock validates with the same functions and answers 422.
+- **Open a dialog by mounting it, close it by unmounting** (`{open && <Dialog …/>}`) — focus return depends
+  on it. Form dialogs pass `closeOnBackdrop={false}`. Use `ConfirmDialog` for anything destructive.
+- **Don't mark a field touched on blur in a dialog:** StrictMode's dev remount moves focus away and back,
+  which fires a blur before the user has typed. Validate on change and on submit.
+- **Inside a column form, `.fld` has no flex-basis** — only `.frow > .fld` does; a basis in a column becomes a height.
+- Every alerting mutation goes through `useAlertingMutation` in `queries.ts`, which invalidates both
+  `alerts` and `nav` (resolving changes the sidebar badge).
