@@ -16,4 +16,8 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  {
+    files: ['dashboard/public/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
 );
