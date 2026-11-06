@@ -289,7 +289,8 @@ export interface NexusInfraData {
 export interface FinVaultService {
   service: ServiceSummary;
   p95: string;
-  rps: number;
+  /** null = not measured (no request-rate source for this service). */
+  rps: number | null;
   errorPct: number | null;
 }
 
@@ -342,4 +343,16 @@ export interface SettingsData {
   routing: Record<Severity, Record<ChannelId, boolean>>;
   retention: { id: 'logs' | 'metrics' | 'heartbeats'; label: string; usedBytes: number; current: string; options: string[] }[];
   storage: { usedBytes: number; totalBytes: number };
+}
+
+// ── Collector ──────────────────────────────────────────────────────────
+/** `GET /health` of the collector itself (not used by the pages; for ops and Docker). */
+export interface CollectorHealth {
+  status: 'ok' | 'degraded';
+  version: string;
+  uptimeSeconds: number;
+  /** Which parts of the API are fed by a configured source; the rest is sample data. */
+  live: Record<'services' | 'nodes' | 'nodeMetrics' | 'requests' | 'queues' | 'logs', boolean>;
+  /** One entry per periodic source job (health target, Control Room poll, scrape, bus). */
+  sources: { name: string; intervalMs: number; lastRunAt: string | null; lastOkAt: string | null; lastError: string | null }[];
 }

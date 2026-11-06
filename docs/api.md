@@ -16,12 +16,13 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 
 | Method & path | Query | Response type | Used by |
 |---|---|---|---|
+| `GET /health` | | `CollectorHealth` | The collector itself: version, which parts are live, each source's last run/error. Also served at `/health` (no `/api`) for Docker |
 | `GET /host` | | `HostInfo` | Sidebar host card |
 | `GET /nav` | | `NavCounts` | Sidebar badge and project counts |
 | `GET /overview` | `range` | `OverviewData` | Overview |
 | `GET /metrics` | `range` | `MetricsOverview` | Metrics summaries + top consumers |
 | `GET /metrics/:id` | `range` | `MetricData` (`id` ∈ cpu, memory, disk, network, queues) | Metrics chart + statistics |
-| `GET /logs` | `q`, `range`, `level` (comma list), `project` | `LogsData` | Logs |
+| `GET /logs` | `q`, `range`, `level` (comma list), `project` | `LogsData` (400 on an unknown range, level or project) | Logs |
 | `GET /heartbeats` | | `HeartbeatsData` | Heartbeats |
 | `GET /alerts` | | `AlertsData` | Alerts |
 | `GET /services/:id` | | `ServiceDetail` (404 when unknown) | Service detail |
@@ -43,3 +44,27 @@ every channel under every severity (`critical`, `warning`, `info`). A Telegram t
 returned masked once the backend stores real values.
 
 Agent tokens are only ever returned as a hint (last four characters); a full token is shown once, at creation.
+
+## Served by the collector
+
+The backend is `collector/` (see [architecture.md](architecture.md)). Every endpoint above is always
+served: a part with a configured source is answered from stored data ("live"), every other part from
+the dashboard's own sample generators, so the API is complete from the first start. `GET /health`
+lists which parts are live.
+
+Rules the live answers follow, beyond the shapes:
+
+- **Series are never padded.** A live series starts at its first measurement in the window and is
+  shorter than the full length until enough history exists (`beats` ≤ 48, `checks` ≤ 120,
+  `responseTimes` ≤ 96, `days` ≤ 60, metric series ≤ 90). A metric nobody measures has no series at
+  all. An empty bucket after the first measurement repeats the previous value.
+- **Unknown is `null`** where the contract allows it: a failed check's latency, `FinVaultService.rps`
+  and `errorPct` while no request-rate source covers FinVault.
+- A few fields are not nullable yet and read `0` while unmeasured: `Monitor.avgLatencyMs`,
+  `ServiceDetail.kpis.avgLatencyMs` / `p95LatencyMs` (no answered check in 24h), `restarts24h` and
+  `NodeSummary.containers` (need the agent). TODO.md tracks making them nullable.
+- Incidents are opened by the collector itself (N failed checks in a row, or a heartbeat source going
+  offline) and every open incident is an active alert. Alert *rules* are not evaluated yet; their
+  list and toggles are stored but the rules themselves are the sample set.
+- Writes are stored in SQLite and survive restarts. `PATCH /settings` answers 400 when a retention
+  value is not one of that kind's `options`.
