@@ -47,6 +47,15 @@ const PATHS = {
     </>
   ),
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.2" />
+      <circle cx="12" cy="12" r="1.2" />
+      <circle cx="19" cy="12" r="1.2" />
+    </>
+  ),
+  filter: <path d="M3 5h18M6 12h12M10 19h4" />,
 } as const;
 
 export type IconName = keyof typeof PATHS;

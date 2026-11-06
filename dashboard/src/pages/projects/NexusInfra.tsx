@@ -82,16 +82,16 @@ function Body({ data }: { data: NexusInfraData }) {
           {data.containers.map((c) => (
             <div key={c.name} className="tr" style={{ minWidth: 760 }}>
               <span className="mono" style={{ flex: '2 1 170px', fontWeight: 500 }}>{c.name}</span>
-              <span className="mono muted" style={{ flex: '2 1 170px', fontSize: 12 }}>{c.image}</span>
-              <span className="mono muted" style={{ flex: '1 1 70px' }}>{c.node}</span>
+              <span className="mono muted" data-label="Image" style={{ flex: '2 1 170px', fontSize: 12 }}>{c.image}</span>
+              <span className="mono muted" data-label="Node" style={{ flex: '1 1 70px' }}>{c.node}</span>
               <span style={{ flex: '1 1 90px' }}><Pill tone={STATE_PILL[c.state]}>{c.state}</Pill></span>
-              <span style={{ flex: '2 1 150px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span data-label="CPU" style={{ flex: '2 1 150px', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Meter pct={c.cpuPct} color={c.cpuPct > 70 ? 'var(--c-warn)' : 'var(--c-nx)'} style={{ flex: 1 }} />
                 <span className="mono r" style={{ width: 40 }}>{c.cpuPct}%</span>
               </span>
-              <span className="mono muted r" style={{ flex: '1 1 80px' }}>{c.memory}</span>
-              <span className="mono muted r" style={{ flex: '1 1 80px' }}>{c.uptime}</span>
-              <span className="mono r" style={{ flex: '0 0 60px', color: c.restarts > 2 ? 'var(--warn)' : 'var(--muted)' }}>{c.restarts}</span>
+              <span className="mono muted r" data-label="Memory" style={{ flex: '1 1 80px' }}>{c.memory}</span>
+              <span className="mono muted r" data-label="Uptime" style={{ flex: '1 1 80px' }}>{c.uptime}</span>
+              <span className="mono r" data-label="Restarts" style={{ flex: '0 0 60px', color: c.restarts > 2 ? 'var(--warn)' : 'var(--muted)' }}>{c.restarts}</span>
             </div>
           ))}
         </div>
