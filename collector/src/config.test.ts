@@ -51,4 +51,41 @@ describe('loadConfig', () => {
     expect(c.bus?.queue).toBe('nexuswatch.collector');
     expect(() => loadConfig({ NW_METRICS_TARGETS: 'http://x/metrics' })).toThrow(/name=/);
   });
+
+  it('leaves every notification channel off until its variables are set', () => {
+    const c = loadConfig({});
+    expect(c.notify.targets).toEqual({ discord: null, telegram: null, push: null, email: null });
+    expect(c.notify.publicUrl).toBeNull();
+  });
+
+  it('reads the notification targets', () => {
+    const c = loadConfig({
+      NW_DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/1/abc',
+      NW_TELEGRAM_BOT_TOKEN: '123456:ABC-def_1',
+      NW_TELEGRAM_CHAT_ID: '-100200',
+      NW_NTFY_URL: 'https://ntfy.example.org/home-alerts',
+      NW_NTFY_TOKEN: 'tk_1',
+      NW_SMTP_URL: 'smtp://user:pass@mail.example.org:587',
+      NW_EMAIL_FROM: 'watch@example.org',
+      NW_EMAIL_TO: 'tom@example.org',
+      NW_PUBLIC_URL: 'https://watch.example.org/',
+    });
+    expect(c.notify.targets.discord?.url).toBe('https://discord.com/api/webhooks/1/abc');
+    expect(c.notify.targets.telegram).toEqual({ token: '123456:ABC-def_1', chatId: '-100200' });
+    expect(c.notify.targets.push).toEqual({ server: 'https://ntfy.example.org/', topic: 'home-alerts', token: 'tk_1' });
+    expect(c.notify.targets.email?.to).toBe('tom@example.org');
+    expect(c.notify.publicUrl).toBe('https://watch.example.org');
+  });
+
+  it('refuses notification targets that are half set or point somewhere unexpected', () => {
+    expect(() => loadConfig({ NW_DISCORD_WEBHOOK_URL: 'https://example.org/api/webhooks/1/abc' })).toThrow(/discord\.com/);
+    expect(() => loadConfig({ NW_DISCORD_WEBHOOK_URL: 'http://discord.com/api/webhooks/1/abc' })).toThrow(/discord\.com/);
+    expect(() => loadConfig({ NW_DISCORD_WEBHOOK_URL: 'https://discord.com.evil.example/api/webhooks/1/abc' })).toThrow(/discord\.com/);
+    expect(() => loadConfig({ NW_TELEGRAM_BOT_TOKEN: '123456:ABC' })).toThrow(/together/);
+    expect(() => loadConfig({ NW_TELEGRAM_BOT_TOKEN: 'not a token', NW_TELEGRAM_CHAT_ID: '1' })).toThrow(/123456:ABC-DEF/);
+    expect(() => loadConfig({ NW_NTFY_URL: 'https://ntfy.sh/' })).toThrow(/topic/);
+    expect(() => loadConfig({ NW_NTFY_URL: 'file:///etc/passwd' })).toThrow(/http/);
+    expect(() => loadConfig({ NW_SMTP_URL: 'smtp://mail.example.org' })).toThrow(/together/);
+    expect(() => loadConfig({ NW_SMTP_URL: 'http://mail.example.org', NW_EMAIL_FROM: 'a@b.c', NW_EMAIL_TO: 'd@e.f' })).toThrow(/smtp/);
+  });
 });

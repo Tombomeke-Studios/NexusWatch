@@ -4,7 +4,10 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-_(no active branch)_
+### `feature/notification-delivery`
+- [x] Channel senders: Discord webhook, Telegram Bot API, ntfy, SMTP — targets from `NW_*` variables, masked in Settings (#—)
+- [x] Notify once when an incident opens and once when it closes, by severity routing; retries, delivery log lines, no repeat after a restart (#—)
+- [x] "Send test" per channel: `POST /settings/channels/:id/test`, outcome shown next to the channel (#—)
 
 ## Backlog
 
@@ -12,7 +15,9 @@ _(no active branch)_
 - [ ] Feed SLOs, `/status` and Business from live sources (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
 - [ ] Live mode: acknowledging keeps no note or time yet, and silences/maintenance windows do not apply to live alerts (#—)
-- [ ] Deliver notifications: Discord webhook, Telegram Bot API `sendMessage`, SMTP, ntfy — and the "Send test" button (#—)
+- [ ] Notifications: run escalation policy steps, and hold delivery during silences and maintenance windows (needs rule evaluation) (#—)
+- [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
+- [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
 - [ ] Evaluate alert rules (today every open incident is an active alert; rules are the sample set + stored toggles) (#—)
 - [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
 - [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
@@ -41,7 +46,7 @@ _(no active branch)_
 
 ### Dashboard
 - [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
-- [ ] Wire the "Coming soon" actions: add monitor, test check, rotate agent token, send test notification (#—)
+- [ ] Wire the "Coming soon" actions: add monitor, test check, rotate agent token (#—)
 - [ ] Alerting follow-ups: Overview's open-alert KPI is still hard-coded in the mock; Service detail's "Escalation" setting is static text — read both from `/alerts` (#—)
 - [ ] Alerting follow-ups: a rule has no per-service/queue scope yet (it covers every target of its project); add label filters like `service="…"` (#—)
 - [ ] Alerting follow-ups: the escalation display infers "sent" from elapsed time; once the collector delivers notifications, return the real delivery log per alert (#—)

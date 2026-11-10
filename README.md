@@ -49,9 +49,16 @@ real stack:
 | `NW_METRICS_TOKEN` | NexusInfra's `METRICS_TOKEN` | Bearer token for protected `/metrics` |
 | `NW_RABBITMQ_URL` | `amqp://guest:guest@localhost:5672` | Heartbeats on `finvault.events` (node CPU / memory / disk) |
 | `FINVAULT_MESSAGE_KEY` | the key both platforms share | Reading encrypted payloads |
+| `NW_DISCORD_WEBHOOK_URL` | `https://discord.com/api/webhooks/…` | Notifications to Discord |
+| `NW_TELEGRAM_BOT_TOKEN` + `NW_TELEGRAM_CHAT_ID` | `123456:ABC-DEF`, `-100…` | Notifications to Telegram |
+| `NW_NTFY_URL` (+ `NW_NTFY_TOKEN`) | `https://ntfy.sh/my-topic` | Push notifications through ntfy |
+| `NW_SMTP_URL` + `NW_EMAIL_FROM` + `NW_EMAIL_TO` | `smtp://user:pass@host:587` | Notifications by email |
 
 Also `NW_PORT` (8080), `NW_DB_PATH`, intervals, timeouts and thresholds, all listed in `.env.example`.
 `GET http://localhost:8080/health` shows which parts are live and each source's last error.
+
+Notification targets are secrets and only ever live in `.env`: Settings shows them masked and has a
+"Send test" button per channel. An incident notifies once when it opens and once when it closes.
 
 ### Dashboard
 

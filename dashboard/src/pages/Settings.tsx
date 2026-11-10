@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useSettings, useUpdateSettings } from '@/api/queries';
-import type { ChannelId, SettingsData, Severity } from '@/api/types';
+import { useSettings, useTestChannel, useUpdateSettings } from '@/api/queries';
+import type { Channel, ChannelId, SettingsData, Severity } from '@/api/types';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { StackBar } from '@/components/ui/charts';
 import { Icon } from '@/components/ui/Icon';
@@ -94,6 +94,44 @@ const CHANNEL_COLUMNS: { id: ChannelId; label: string }[] = [
 ];
 const SEVERITIES: Severity[] = ['critical', 'warning', 'info'];
 
+/** One channel: what it is, where it sends (masked), a test button with its outcome, and its switch. */
+function ChannelRow({ channel: c, onToggle }: { channel: Channel; onToggle: (enabled: boolean) => void }) {
+  const test = useTestChannel();
+  const outcome = test.isError ? { ok: false, detail: 'The test could not be started' } : test.data;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', padding: '16px 20px', borderBottom: '1px solid var(--surface2)' }}>
+      <div style={{ flex: '1 1 220px' }}>
+        <div style={{ fontWeight: 600 }}>{c.name}</div>
+        <div className="muted" style={{ fontSize: 13 }}>{c.description}</div>
+      </div>
+      {c.configured ? (
+        <label style={{ flex: '2 1 300px' }}>
+          <span className="sr-only">{c.name} target</span>
+          {/* Keyed on the value: an uncontrolled input would keep the text it was first rendered with. */}
+          <input key={c.target} className="inp" type="text" defaultValue={c.target} readOnly />
+        </label>
+      ) : (
+        // Plain text, so the variable names wrap instead of being cut off in a field.
+        <div className="mono subtle" style={{ flex: '2 1 300px', fontSize: 12.5, overflowWrap: 'anywhere' }}>{c.target}</div>
+      )}
+      <button
+        type="button"
+        className="btn"
+        disabled={!c.configured || test.isPending}
+        title={c.configured ? undefined : 'Set its target on the collector first'}
+        onClick={() => test.mutate(c.id)}
+      >
+        {test.isPending ? 'Sending…' : 'Send test'}
+      </button>
+      <Switch on={c.enabled} label={`${c.name} enabled`} onChange={onToggle} />
+      {/* Always mounted so a screen reader announces the outcome when it arrives. */}
+      <div role="status" style={{ flex: '1 1 100%', fontSize: 13, color: outcome?.ok ? 'var(--ok)' : 'var(--down)' }} hidden={!outcome || test.isPending}>
+        {outcome && (outcome.ok ? `Test sent — ${outcome.detail}` : `Test failed — ${outcome.detail}`)}
+      </div>
+    </div>
+  );
+}
+
 function Notifications({ data }: { data: SettingsData }) {
   const update = useUpdateSettings();
   const toggleChannel = (id: ChannelId, enabled: boolean) => update.mutate({ channels: data.channels.map((c) => (c.id === id ? { ...c, enabled } : c)) });
@@ -105,18 +143,7 @@ function Notifications({ data }: { data: SettingsData }) {
       <Card labelledBy="kn">
         <CardHeader id="kn" title="Channels" hint="where notifications go" />
         {data.channels.map((c) => (
-          <div key={c.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', padding: '16px 20px', borderBottom: '1px solid var(--surface2)' }}>
-            <div style={{ flex: '1 1 220px' }}>
-              <div style={{ fontWeight: 600 }}>{c.name}</div>
-              <div className="muted" style={{ fontSize: 13 }}>{c.description}</div>
-            </div>
-            <label style={{ flex: '2 1 300px' }}>
-              <span className="sr-only">{c.name} target</span>
-              <input className="inp" type="text" defaultValue={c.target} readOnly />
-            </label>
-            <button type="button" className="btn" disabled title="Coming soon">Send test</button>
-            <Switch on={c.enabled} label={`${c.name} enabled`} onChange={(v) => toggleChannel(c.id, v)} />
-          </div>
+          <ChannelRow key={c.id} channel={c} onToggle={(v) => toggleChannel(c.id, v)} />
         ))}
       </Card>
 

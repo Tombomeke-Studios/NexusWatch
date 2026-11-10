@@ -3,9 +3,10 @@
  * a part that is not live is answered from the dashboard's sample data.
  */
 import type { Config } from '../config.js';
+import type { Mailer, NotifyDeps } from '../notify/channels.js';
 import { sample } from '../sample.js';
 import type { Store } from '../store.js';
-import type { Clock, TaskStatus } from '../sources/types.js';
+import type { Clock, Fetch, TaskStatus } from '../sources/types.js';
 import { restoreState } from './persist.js';
 
 export interface Live {
@@ -31,6 +32,8 @@ export interface Ctx {
   live: Live;
   tasks: () => TaskStatus[];
   startedAt: number;
+  /** What the notification senders use to reach the outside world. */
+  notify: NotifyDeps;
 }
 
 export function liveFor(config: Config): Live {
@@ -47,11 +50,14 @@ export function liveFor(config: Config): Live {
   };
 }
 
-export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[] } = {}): Ctx {
+export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[]; fetch?: Fetch; mail?: Mailer | null } = {}): Ctx {
   const clock = opts.clock ?? Date.now;
   // Alerting and incident writes from an earlier run (views/persist.ts).
   restoreState(store);
-  return { store, config, clock, sample, live: liveFor(config), tasks: opts.tasks ?? (() => []), startedAt: clock() };
+  return {
+    store, config, clock, sample, live: liveFor(config), tasks: opts.tasks ?? (() => []), startedAt: clock(),
+    notify: { fetch: opts.fetch ?? fetch, mail: opts.mail ?? null, timeoutMs: config.notify.timeoutMs },
+  };
 }
 
 export const iso = (ms: number) => new Date(ms).toISOString();

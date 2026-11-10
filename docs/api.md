@@ -50,7 +50,8 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 | `POST /escalation-policies` | `EscalationPolicyInput` | Creates a policy → `EscalationPolicy` |
 | `PUT /escalation-policies/:id` | `EscalationPolicyInput` | Replaces a policy |
 | `DELETE /escalation-policies/:id` | | Deletes a policy; rules that used it fall back to none |
-| `PATCH /settings` | any of `{ channels, routing, retention }` | Replaces the given settings sections |
+| `PATCH /settings` | any of `{ channels, routing, retention }` | Replaces the given settings sections. Of a channel only `enabled` is taken; `target` and `configured` are ignored |
+| `POST /settings/channels/:id/test` | | Sends one test message through that channel → `ChannelTestResult` (404 for an unknown channel) |
 
 A write the backend refuses because the input is invalid answers **422** with a one-line reason as
 the body; an unknown id answers **404**.
@@ -86,9 +87,17 @@ Every write above is followed by a refetch of it.
   its history entry (`alertId` links the two while the alert exists).
 
 Notification channel ids are `discord`, `telegram`, `email` and `push`; `routing` has an entry for
-every channel under every severity (`critical`, `warning`, `info`). A Telegram target is a bot
-`sendMessage` URL with the chat id — the bot token is a secret and, like agent tokens, should only be
-returned masked once the backend stores real values.
+every channel under every severity (`critical`, `warning`, `info`).
+
+**Where a channel sends to is never part of the API.** A webhook URL, bot token or ntfy topic is a
+secret, and an endpoint that accepted one would let anyone who can reach the API make the backend call
+an address of their choosing. Targets are the backend's own configuration; `Channel.target` is a masked
+description (`discord.com/api/webhooks/••••a1b2`), and `Channel.configured` says whether there is one.
+While there is none, `target` names what to set and the dashboard disables "Send test".
+
+A channel test answers 200 with `{ ok, detail }` whether or not the message arrived — a failed delivery
+is a result, not an HTTP error — and `detail` never contains the target. It ignores the channel's
+switch and the routing, so a channel can be tried before it is turned on.
 
 Agent tokens are only ever returned as a hint (last four characters); a full token is shown once, at creation.
 
@@ -110,6 +119,13 @@ already resolved, 400 invalid input), and a refused write stores nothing.
 
 Without a live source, `POST /alerts/:id/ack` keeps the note and the time of acknowledgement, and
 answers 404 for an alert that is not active.
+
+**Notifications.** With a live source the collector notifies when an incident opens and again when
+it closes, through every channel that the incident's severity is routed to, is switched on and has a
+target. Each message is sent once: what was delivered is stored, so a restart does not repeat it; a
+channel that fails is retried on the next run, five times at most, and every delivery or failure is a
+log line of the `collector` service. The all-clear only goes to channels the alarm reached. Sample
+alerts never notify. Escalation steps, silences and maintenance windows do not affect delivery yet.
 
 Rules the live answers follow, beyond the shapes:
 

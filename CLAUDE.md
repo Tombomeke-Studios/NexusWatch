@@ -29,8 +29,9 @@ replace each `(#—)` with its `(#N)` → from then on, sections 2a and 2b apply
 
 **What exists:** every page from the design, routed, wired to React Query hooks; the `collector`
 workspace serving every path of [docs/api.md](docs/api.md) (health checks, Control Room, Prometheus
-scrape, event-bus heartbeats → SQLite; sample data for anything without a source).
-**What does not:** the agent, alert-rule evaluation, notification delivery, FinVault business data.
+scrape, event-bus heartbeats → SQLite; sample data for anything without a source), and notification
+delivery for real incidents (Discord, Telegram, ntfy, email).
+**What does not:** the agent, alert-rule evaluation (and escalation), FinVault business data.
 
 **Relation to the other projects.** NexusWatch is a *read-only observer*. It never changes NexusInfra
 or FinVault state and never shares their databases. Built data sources (collector): NexusInfra's
@@ -158,7 +159,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `dashboard/public/` | `favicon.svg`, PWA `manifest.webmanifest`, icons (`icon*.svg` sources → `icon-192/512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`), `sw.js` (app-shell service worker, never caches `/api`) |
 | `dashboard/scripts/render-icons.sh` | Regenerates the PNG icons from the SVG sources with headless Chrome |
 | `.claude/launch.json` | Browser-preview entries: `dashboard` (sample data), `dashboard+collector` |
-| `.env.example` | Every collector variable (sources, timings, retention prune) |
+| `.env.example` | Every collector variable (sources, notification targets, timings, retention prune) |
 | `docker-compose.yml` · `.dockerignore` | Collector (SQLite volume) + dashboard (nginx proxying `/api`) |
 | `docs/` | `architecture.md` (data flow, planned services) · `api.md` (HTTP contract) |
 
@@ -223,6 +224,9 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `sources/prometheus.ts` | Text-format parser (kept series only) + scraper with counter rates and histogram p95 |
 | `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
 | `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
+| `notify/channels.ts` | One sender per channel (Discord, Telegram, ntfy, email), `send()` that never throws, `maskTarget`, error scrubbing |
+| `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
+| `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
 | `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business, SLOs, incidents, `/status` and the alerting writes — sample generators), `persist` (snapshots the sample modules' alerting and incident state into SQLite after each write; `createCtx` restores it) |
 | `contract.test.ts` | The mock invariants over HTTP, sample mode and live mode |
@@ -263,6 +267,10 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 - **New mutable state in a mock module must join its snapshot** (`alertingState()` in `data.ts`,
   `incidentState()` in `reliability.ts`) — the collector persists exactly that snapshot, so anything
   left out is lost on restart. A sampled write route must go through `run(ctx, …)` so it is saved.
+- **A notification target never crosses the API.** Targets come from `NW_*` variables only; `Channel.target`
+  is masked and `PATCH /settings` keeps nothing of a channel but `enabled`. Never add an endpoint that
+  accepts a URL for the collector to call, and send every channel error through `send()`, which scrubs secrets.
+- **Route handlers may be async** (`server.ts` awaits them); a rejected promise reaches the error handler.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in
   `queries.ts`; never call `fetch` from a page.

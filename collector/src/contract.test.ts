@@ -22,6 +22,7 @@ const TARGETS = [
 ];
 
 interface Api {
+  base: string;
   get<T>(path: string): Promise<T>;
   status(path: string, init?: RequestInit): Promise<number>;
   close(): Promise<void>;
@@ -32,6 +33,7 @@ async function serve(ctx: Ctx): Promise<Api> {
   await new Promise<void>((r) => server.once('listening', () => r()));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
+    base,
     async get<T>(path: string) {
       const res = await fetch(base + path);
       if (!res.ok) throw new Error(`${path} → ${res.status} ${await res.text()}`);
@@ -151,6 +153,28 @@ describe.each(modes)('HTTP contract — %s', (_mode, make) => {
     for (const severity of ['critical', 'warning', 'info'] as const) {
       expect(Object.keys(s.routing[severity]).sort()).toEqual([...ids].sort());
     }
+  });
+
+  it('never returns a channel target it could send to, and stores only the switch', async () => {
+    const s = await api.get<C.SettingsData>('/api/settings');
+    // No NW_* target is set in these tests: every channel says so instead of showing a placeholder URL.
+    for (const c of s.channels) {
+      expect(c.configured).toBe(false);
+      expect(c.target).toMatch(/^Not configured — set NW_/);
+    }
+    const flipped = s.channels.map((c) => (c.id === 'telegram' ? { ...c, enabled: !c.enabled, target: 'https://attacker.example/hook', configured: true } : c));
+    expect(await api.status('/api/settings', { method: 'PATCH', body: JSON.stringify({ channels: flipped }) })).toBe(204);
+    const after = (await api.get<C.SettingsData>('/api/settings')).channels.find((c) => c.id === 'telegram')!;
+    expect(after.enabled).toBe(!s.channels.find((c) => c.id === 'telegram')!.enabled);
+    expect(after.configured).toBe(false);
+    expect(after.target).not.toContain('attacker');
+  });
+
+  it('answers a channel test with a result, and 404 for a channel that does not exist', async () => {
+    const res = await fetch(`${api.base}/api/settings/channels/discord/test`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: false, detail: expect.stringContaining('NW_DISCORD_WEBHOOK_URL') });
+    expect(await api.status('/api/settings/channels/fax/test', { method: 'POST' })).toBe(404);
   });
 
   it('stores retention changes and rejects values that are not offered', async () => {

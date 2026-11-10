@@ -15,7 +15,7 @@ import type {
   ProjectId, ServiceDetail, ServiceSummary, SettingsData,
 } from '../types';
 import { incidentSummaries } from './reliability';
-import type { AccountStanding, BusinessData, PlanRevenue, TopUpRecord } from '../types';
+import type { AccountStanding, BusinessData, ChannelTestResult, PlanRevenue, TopUpRecord } from '../types';
 import type {
   AlertNote, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleCondition,
   RuleMetric, RuleTestResult, Silence, SilenceInput,
@@ -719,10 +719,10 @@ const agents: Agent[] = [
 ];
 
 const channels: Channel[] = [
-  { id: 'discord', name: 'Discord', description: 'Webhook to your own server', target: 'https://discord.com/api/webhooks/[ID]/[TOKEN]', enabled: true },
-  { id: 'telegram', name: 'Telegram', description: 'Bot message to a chat, group or channel', target: 'https://api.telegram.org/bot[BOT-TOKEN]/sendMessage?chat_id=[CHAT-ID]', enabled: false },
-  { id: 'email', name: 'Email', description: 'SMTP through your home server', target: 'you@example.com', enabled: true },
-  { id: 'push', name: 'Push (ntfy)', description: 'Instant notification on your phone', target: 'https://ntfy.sh/[YOUR-TOPIC]', enabled: true },
+  { id: 'discord', name: 'Discord', description: 'Webhook to your own server', target: 'https://discord.com/api/webhooks/[ID]/[TOKEN]', configured: true, enabled: true },
+  { id: 'telegram', name: 'Telegram', description: 'Bot message to a chat, group or channel', target: 'https://api.telegram.org/bot[BOT-TOKEN]/sendMessage?chat_id=[CHAT-ID]', configured: true, enabled: false },
+  { id: 'email', name: 'Email', description: 'SMTP through your home server', target: 'you@example.com', configured: true, enabled: true },
+  { id: 'push', name: 'Push (ntfy)', description: 'Instant notification on your phone', target: 'https://ntfy.sh/[YOUR-TOPIC]', configured: true, enabled: true },
 ];
 
 const routing: SettingsData['routing'] = {
@@ -746,6 +746,12 @@ export function settings(): SettingsData {
     retention: retention.map((r) => ({ ...r })),
     storage: { usedBytes: 18.4 * GB, totalBytes: 100 * GB },
   };
+}
+
+/** The sample stands in for a backend whose channels all work: nothing leaves the browser. */
+export function testChannel(id: string): ChannelTestResult {
+  if (!channels.some((c) => c.id === id)) throw new ApiError(404, `Channel ${id} not found`);
+  return { ok: true, detail: 'Sample data — nothing was sent' };
 }
 
 export function updateSettings(patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>): void {
