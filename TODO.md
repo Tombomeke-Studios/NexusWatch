@@ -4,11 +4,7 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-### `feature/rule-evaluation`
-- [x] Evaluate alert rules in the collector with `lib/rules.ts` semantics (for-duration, unknown ≠ 0): latency, CPU, memory, disk (#—)
-- [x] A firing rule opens an alert with its real rule id, current value and trend; it resolves when the condition clears or the rule is switched off or deleted (#—)
-- [x] Silences on a rule and maintenance windows apply to live alerts and hold their notifications (#—)
-- [x] `POST /alert-rules/test` evaluates against live data; maintenance windows can be scoped to monitored services (#—)
+_(no active branch)_
 
 ## Backlog
 
@@ -71,6 +67,12 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
+### `feature/rule-evaluation` — merged into `dev`
+- [x] Evaluate alert rules in the collector with `lib/rules.ts` semantics (for-duration, unknown ≠ 0): latency, CPU, memory, disk (#—)
+- [x] A firing rule opens an alert with its real rule id, current value and trend; it resolves when the condition clears or the rule is switched off or deleted (#—)
+- [x] Silences on a rule and maintenance windows apply to live alerts and hold their notifications (#—)
+- [x] `POST /alert-rules/test` evaluates against live data; maintenance windows can be scoped to monitored services (#—)
+
 ### `feature/notification-delivery` — merged into `dev`
 - [x] Channel senders: Discord webhook, Telegram Bot API, ntfy, SMTP — targets from `NW_*` variables, masked in Settings (#—)
 - [x] Notify once when an incident opens and once when it closes, by severity routing; retries, delivery log lines, no repeat after a restart (#—)
