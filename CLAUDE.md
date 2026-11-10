@@ -30,8 +30,8 @@ replace each `(#—)` with its `(#N)` → from then on, sections 2a and 2b apply
 **What exists:** every page from the design, routed, wired to React Query hooks; the `collector`
 workspace serving every path of [docs/api.md](docs/api.md) (health checks, Control Room, Prometheus
 scrape, event-bus heartbeats → SQLite; sample data for anything without a source), and notification
-delivery for real incidents (Discord, Telegram, ntfy, email).
-**What does not:** the agent, alert-rule evaluation (and escalation), FinVault business data.
+delivery for real incidents (Discord, Telegram, ntfy, email), and rule evaluation on live latency and node metrics.
+**What does not:** the agent, escalation steps, rule metrics without a source (queue depth, 5xx rate, top-ups), FinVault business data.
 
 **Relation to the other projects.** NexusWatch is a *read-only observer*. It never changes NexusInfra
 or FinVault state and never shares their databases. Built data sources (collector): NexusInfra's
@@ -224,6 +224,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `sources/prometheus.ts` | Text-format parser (kept series only) + scraper with counter rates and histogram p95 |
 | `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
 | `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
+| `alerting/readings.ts` | `liveReadings`: stored checks and node samples as `Reading`s at a fixed step (unknown = `null`); `bucketsBack` |
+| `alerting/evaluate.ts` | `evaluateRules` / `rulesTask`: opens and closes `rule:<ruleId>:<target>` incidents; `testRuleLive`, `currentReading`, `parseSubject` |
 | `notify/channels.ts` | One sender per channel (Discord, Telegram, ntfy, email), `send()` that never throws, `maskTarget`, error scrubbing |
 | `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
 | `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
@@ -267,6 +269,13 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 - **New mutable state in a mock module must join its snapshot** (`alertingState()` in `data.ts`,
   `incidentState()` in `reliability.ts`) — the collector persists exactly that snapshot, so anything
   left out is lost on restart. A sampled write route must go through `run(ctx, …)` so it is saved.
+- **Rules are evaluated by `evaluateRule` from `dashboard/src/lib/rules.ts`, in the collector too.** Never
+  re-implement the comparison or the for-duration there; give it readings (`alerting/readings.ts`). A new rule
+  metric needs a reading source, or its rules silently have no targets.
+- **An incident's subject says who opened it:** `service:<id>` (health checker), `source:<name>` (heartbeat
+  tracker), `rule:<ruleId>:<target>` (rule evaluation). `alertTarget()` in `views/alerts.ts` is the one place that reads it.
+- **Mock functions that validate against sample data take the real list as an optional argument**
+  (`createMaintenance(input, known)`), so the collector can pass the monitored services.
 - **A notification target never crosses the API.** Targets come from `NW_*` variables only; `Channel.target`
   is masked and `PATCH /settings` keeps nothing of a channel but `enabled`. Never add an endpoint that
   accepts a URL for the collector to call, and send every channel error through `send()`, which scrubs secrets.

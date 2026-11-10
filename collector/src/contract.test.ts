@@ -254,6 +254,32 @@ describe('HTTP contract — live specifics', () => {
     expect(hb.incidents.some((i) => i.open && i.title === 'invoice-service is not responding')).toBe(true);
   });
 
+  it('tests a rule against the live checks, and refuses a malformed one', async () => {
+    const init = (b: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(b) });
+    const res = await fetch(`${api.base}/api/alert-rules/test`, { ...init({ project: 'finvault', condition: { metric: 'latency', comparator: '>', threshold: 100, forSeconds: 0 } }), headers: { 'Content-Type': 'application/json' } });
+    const result = (await res.json()) as C.RuleTestResult;
+    // api-gateway answers in 140 ms; invoice-service does not answer, which is no data, not 0 ms.
+    expect(result.targets.find((t) => t.serviceId === 'fv-api-gateway')).toMatchObject({ state: 'firing', value: 140 });
+    expect(result.targets.find((t) => t.serviceId === 'fv-invoice-service')).toMatchObject({ state: 'no_data', value: null });
+    expect(await api.status('/api/alert-rules/test', init({ project: 'finvault', condition: { metric: 'nope' } }))).toBe(422);
+    expect(await api.status('/api/alert-rules/test', init({}))).toBe(422);
+  });
+
+  it('scopes a maintenance window to a monitored service, not to a sample one', async () => {
+    const window = { title: 'Gateway upgrade', project: 'finvault', startsAt: new Date().toISOString(), durationMinutes: 30, recurrence: 'none' };
+    const init = (b: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(b) });
+    expect(await api.status('/api/maintenance-windows', init({ ...window, serviceId: 'fv-account-service' }))).toBe(422);
+    const res = await fetch(`${api.base}/api/maintenance-windows`, { ...init({ ...window, serviceId: 'fv-invoice-service' }), headers: { 'Content-Type': 'application/json' } });
+    expect(res.status).toBe(200);
+    const { id } = (await res.json()) as C.MaintenanceWindow;
+    const a = await api.get<C.AlertsData>('/api/alerts');
+    expect(a.services.map((x) => x.id)).toEqual(TARGETS.map((t) => t.id));
+    // The open invoice-service outage is now inside the window.
+    expect(a.active.find((x) => x.serviceId === 'fv-invoice-service')?.maintenanceId).toBe(id);
+    expect(a.summary.inMaintenance).toBe(1);
+    expect(await api.status(`/api/maintenance-windows/${id}`, { method: 'DELETE' })).toBe(204);
+  });
+
   it('marks a slow answer slow and leaves unmeasured FinVault rates null', async () => {
     const fv = await api.get<C.FinVaultData>('/api/projects/finvault');
     expect(fv.services.map((s) => s.service.id)).toEqual(['fv-api-gateway', 'fv-invoice-service']);

@@ -42,6 +42,14 @@ with an injected `fetch` and clock so it is tested without a network:
   (slow after 3 s, offline after 10 s); sources reported by the Control Room keep the status of its
   last poll. Going offline opens an incident.
 
+**Rule evaluation** — `collector/src/alerting`. A periodic task turns stored measurements into
+readings (per service: heartbeat and latency from the health checks; per node: CPU, memory and disk
+from the bus heartbeats, bucketed per minute) and evaluates every enabled rule with the dashboard's
+own `evaluateRule`, so "test rule" in the editor and the collector cannot disagree. A target whose
+condition held for the rule's duration opens an incident; it closes when the condition clears. A
+missing measurement is unknown: it neither fires nor resolves. Outages stay with the health checker
+and the heartbeat tracker, which open "not responding" / "offline" themselves.
+
 **Notifications** — `collector/src/notify`. One sender per channel (Discord webhook, Telegram Bot API
 `sendMessage`, ntfy as JSON, SMTP through nodemailer), each configured by its own `NW_*` variables and
 off until they are set. A periodic task compares the incidents in the store with what it already
@@ -85,7 +93,7 @@ built with `VITE_USE_MOCKS=false`, served by nginx, which proxies `/api` to the 
   inventory), authenticated with a per-node token. Until then Settings → Agents is sample data.
 - **FinVault business data**: top-ups, payments, transactions and request rates from FinVault's
   gateway events (`bank.payment.*` and `events.<type>` keys on the same exchange).
-- **Alert rule evaluation**, and with it escalation steps, silences and maintenance windows acting on delivery.
+- **Escalation policy steps** acting on delivery, and sources for the FinVault rule metrics (queue depth, 5xx rate, top-ups).
 
 - **Business view** (`/business`): the collector would read the Billing Bridge's top-up ledger, credit
   ledger, standing and suspensions (hosted edition only), watch `payment.request` and FinVault's
