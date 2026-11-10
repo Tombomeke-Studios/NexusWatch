@@ -6,6 +6,7 @@
 import type { ActiveAlert, AlertRule, AlertsData, Incident } from '../contract.js';
 import type { IncidentRow } from '../store.js';
 import { DAY_MS, iso, seconds, type Ctx } from './ctx.js';
+import { saveState } from './persist.js';
 
 const ACKS = 'alerts.acknowledged';
 const RULES = 'alerts.rules';
@@ -24,7 +25,15 @@ function acknowledged(ctx: Ctx): Set<string> {
   return new Set(ctx.store.get<string[]>(ACKS) ?? []);
 }
 
-export function acknowledge(ctx: Ctx, id: string): void {
+/**
+ * Sample alerts are acknowledged in the sample module (which keeps the time and the note; 404 when
+ * the alert is not active) and snapshotted; live alerts only record that they were acknowledged.
+ */
+export function acknowledge(ctx: Ctx, id: string, note = ''): void {
+  if (!ctx.live.logs) {
+    ctx.sample.acknowledgeAlert(id, note);
+    saveState(ctx.store);
+  }
   const acks = acknowledged(ctx);
   acks.add(id);
   ctx.store.set(ACKS, [...acks]);

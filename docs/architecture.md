@@ -45,7 +45,9 @@ with an injected `fetch` and clock so it is tested without a network:
 **Storage** — one SQLite file through Node's built-in `node:sqlite` (no native module to compile).
 It keeps log lines (each with a stored id, so deep links stay valid), health checks, metric samples,
 the last-known state of heartbeat sources, incidents, and what the dashboard writes (settings,
-acknowledgements, rule toggles). Retention is per kind — logs, metrics, heartbeats — and follows the
+acknowledgements, rule toggles, and a snapshot of the alerting and incident state — rules, silences,
+maintenance windows, escalation policies, notes, declared incidents — taken after every write and
+loaded at start). Retention is per kind — logs, metrics, heartbeats — and follows the
 values chosen on the Settings page; pruning runs at start, every `NW_PRUNE_INTERVAL_MS`, and whenever
 retention is changed. Open incidents are never pruned.
 

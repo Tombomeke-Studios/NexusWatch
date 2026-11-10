@@ -97,7 +97,7 @@ export function slos(): SloData {
 }
 
 // ── Incidents ──────────────────────────────────────────────────────────
-interface StoredIncident extends Omit<IncidentDetail, 'affected' | 'durationSeconds'> {
+export interface StoredIncident extends Omit<IncidentDetail, 'affected' | 'durationSeconds'> {
   serviceIds: string[];
 }
 
@@ -267,6 +267,22 @@ export function resolveIncident(id: string, input: ResolveIncident): IncidentDet
   s.updates.unshift(upd(0, 'resolved', input.message.trim() || 'This incident has been resolved.', input.public));
   if (input.postmortem) s.postmortem = structuredClone(input.postmortem);
   return toDetail(s);
+}
+
+/** The incident store as plain JSON. The collector stores it so declared incidents survive a restart. */
+export interface IncidentState {
+  updateSeq: number;
+  incidents: StoredIncident[];
+}
+
+export function incidentState(): IncidentState {
+  return structuredClone({ updateSeq, incidents: incidentStore });
+}
+
+/** Replaces the incident store with a snapshot from `incidentState()`. */
+export function restoreIncidentState(state: IncidentState): void {
+  updateSeq = Math.max(updateSeq, state.updateSeq);
+  incidentStore.splice(0, incidentStore.length, ...structuredClone(state.incidents));
 }
 
 // ── Public status page ─────────────────────────────────────────────────

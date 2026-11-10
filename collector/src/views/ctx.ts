@@ -6,6 +6,7 @@ import type { Config } from '../config.js';
 import { sample } from '../sample.js';
 import type { Store } from '../store.js';
 import type { Clock, TaskStatus } from '../sources/types.js';
+import { restoreState } from './persist.js';
 
 export interface Live {
   /** Health targets → services, monitors, service detail. */
@@ -48,6 +49,8 @@ export function liveFor(config: Config): Live {
 
 export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[] } = {}): Ctx {
   const clock = opts.clock ?? Date.now;
+  // Alerting and incident writes from an earlier run (views/persist.ts).
+  restoreState(store);
   return { store, config, clock, sample, live: liveFor(config), tasks: opts.tasks ?? (() => []), startedAt: clock() };
 }
 

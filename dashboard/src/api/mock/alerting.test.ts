@@ -153,3 +153,37 @@ describe('mock alerting', () => {
     expect(mock.alerts().policies[0].steps.length).toBe(a.policies[0].steps.length + 1);
   });
 });
+
+/** The collector stores this snapshot so alerting writes survive a restart. */
+describe('mock alerting state snapshot', () => {
+  it('restores rules, silences, windows, policies, acks and notes from plain JSON', () => {
+    const before = mock.alertingState();
+    try {
+      const created = mock.createRule({ ...inputOf(rule('r5')), name: 'Snapshot me' });
+      const alertId = mock.alerts().active[0].id;
+      mock.acknowledgeAlert(alertId, 'On it');
+      const saved = JSON.parse(JSON.stringify(mock.alertingState())) as ReturnType<typeof mock.alertingState>;
+
+      mock.restoreAlertingState(before);
+      expect(mock.alerts().rules.some((r) => r.id === created.id)).toBe(false);
+      expect(mock.alerts().active.find((a) => a.id === alertId)?.acknowledged).toBe(false);
+
+      mock.restoreAlertingState(saved);
+      const after = mock.alerts();
+      expect(after.rules.find((r) => r.id === created.id)?.name).toBe('Snapshot me');
+      const alert = after.active.find((a) => a.id === alertId)!;
+      expect(alert.acknowledged).toBe(true);
+      expect(alert.notes.map((n) => n.text)).toContain('On it');
+      // Ids keep counting from where the snapshot left off, so a new rule never reuses one.
+      expect(mock.createRule({ ...inputOf(rule('r5')), name: 'After restore' }).id).not.toBe(created.id);
+    } finally {
+      mock.restoreAlertingState(before);
+    }
+  });
+
+  it('is a copy: changing the snapshot does not change the state', () => {
+    const snap = mock.alertingState();
+    snap.rules.length = 0;
+    expect(mock.alerts().rules.length).toBeGreaterThan(0);
+  });
+});

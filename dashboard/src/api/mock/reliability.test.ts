@@ -152,3 +152,28 @@ describe('public status page', () => {
     expect(page.maintenance.every((m) => m.endsAt > m.startsAt)).toBe(true);
   });
 });
+
+/** The collector stores this snapshot so declared incidents survive a restart. */
+describe('mock incident state snapshot', () => {
+  it('restores declared incidents and their updates from plain JSON', () => {
+    const before = reliability.incidentState();
+    try {
+      const made = reliability.createIncident({ title: 'Snapshot incident', severity: 'warning', serviceIds: [mock.services[0].id], message: 'Looking', public: false });
+      reliability.postIncidentUpdate(made.id, { status: 'identified', message: 'Found it', public: false });
+      const saved = JSON.parse(JSON.stringify(reliability.incidentState())) as ReturnType<typeof reliability.incidentState>;
+
+      reliability.restoreIncidentState(before);
+      expect(reliability.incident(made.id)).toBeNull();
+
+      reliability.restoreIncidentState(saved);
+      const back = reliability.incident(made.id)!;
+      expect(back.status).toBe('identified');
+      expect(back.updates.map((u) => u.message)).toEqual(['Found it', 'Looking']);
+      // Update ids keep counting, so a new update never collides with a restored one.
+      const next = reliability.postIncidentUpdate(made.id, { status: 'monitoring', message: 'Watching', public: false });
+      expect(new Set(next.updates.map((u) => u.id)).size).toBe(next.updates.length);
+    } finally {
+      reliability.restoreIncidentState(before);
+    }
+  });
+});
