@@ -5,6 +5,7 @@
  */
 import type { CollectorHealth, LogLevel, MetricId, ProjectId } from './contract.js';
 import { isRange, type Range } from './duration.js';
+import { testChannel } from './notify/dispatch.js';
 import { acknowledge, alerts, setRuleEnabled } from './views/alerts.js';
 import type { Ctx } from './views/ctx.js';
 import { logs } from './views/logs.js';
@@ -14,7 +15,7 @@ import { serviceDetail } from './views/services.js';
 import { sampledRoutes } from './views/sampled.js';
 import { settings, updateSettings, type SettingsPatch } from './views/settings.js';
 
-/** An answer: JSON body (200), `null` (204), or an HttpError. */
+/** An answer: JSON body (200), `null` (204), or an HttpError — directly or as a promise. */
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -126,6 +127,11 @@ export const routes: Route[] = [
       }
       return null;
     },
+  },
+  {
+    method: 'POST',
+    path: '/settings/channels/:id/test',
+    handle: async (ctx, { params }) => (await testChannel(ctx, params.id)) ?? (() => { throw new HttpError(404, `Channel ${params.id} not found`); })(),
   },
   // Not fed by a live source yet: answered from the dashboard's sample generators.
   ...sampledRoutes,

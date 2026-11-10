@@ -11,8 +11,8 @@ export function createApp(ctx: Ctx) {
   const api = express.Router();
   for (const route of routes) {
     const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
-    api[method](route.path, (req: Request, res: Response) => {
-      const result = route.handle(ctx, {
+    api[method](route.path, async (req: Request, res: Response) => {
+      const result = await route.handle(ctx, {
         params: req.params as Record<string, string>,
         query: req.query as Record<string, string | undefined>,
         body: req.body,

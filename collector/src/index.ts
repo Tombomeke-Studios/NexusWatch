@@ -1,5 +1,7 @@
 /** Entry point: config → store → sources → HTTP. Everything here is wiring; logic lives in tested modules. */
 import { loadConfig } from './config.js';
+import { notifyTask } from './notify/dispatch.js';
+import { createMailer } from './notify/mailer.js';
 import { HeartbeatConsumer, startBus } from './sources/bus.js';
 import { controlRoomTask } from './sources/controlRoom.js';
 import { healthTasks } from './sources/health.js';
@@ -22,8 +24,15 @@ const tasks: Task[] = [
   ...metricsTasks(config.metrics.targets, new PrometheusScraper(store, fetch, clock, config.metrics.token), config.metrics.intervalMs),
   ...(config.bus ? [{ name: 'bus:evaluate', intervalMs: DEGRADED_MS, run: async () => evaluateBusSources(store, clock()) }] : []),
 ];
-const scheduler = new Scheduler(tasks, clock, (task, error) => console.warn(`[collector] ${task}: ${error}`));
-const ctx = createCtx(store, config, { clock, tasks: () => scheduler.snapshot() });
+const email = config.notify.targets.email;
+const ctx = createCtx(store, config, {
+  clock,
+  tasks: () => scheduler.snapshot(),
+  mail: email ? createMailer(email.smtpUrl, config.notify.timeoutMs) : null,
+});
+// Notifications only make sense for real incidents, so the task exists only with a live source.
+if (ctx.live.logs) tasks.push(notifyTask(ctx));
+const scheduler: Scheduler = new Scheduler(tasks, clock, (task, error) => console.warn(`[collector] ${task}: ${error}`));
 
 // Retention: once at start, then on an interval (and whenever Settings changes it).
 const pruneOnce = () => {
@@ -53,6 +62,8 @@ const live = Object.entries(ctx.live).filter(([, on]) => on).map(([k]) => k);
 const server = createApp(ctx).listen(config.port, () => {
   console.log(`[collector] listening on http://localhost:${config.port} (API under /api)`);
   console.log(`[collector] live: ${live.length ? live.join(', ') : 'nothing — every endpoint serves sample data'}`);
+  const channels = Object.entries(config.notify.targets).filter(([, t]) => t).map(([id]) => id);
+  console.log(`[collector] notification channels: ${channels.length ? channels.join(', ') : 'none configured'}`);
 });
 
 const shutdown = async () => {

@@ -14,7 +14,7 @@ import type {
 import type {
   IncidentDetail, IncidentsData, NewIncident, NewIncidentUpdate, ResolveIncident, SloData, StatusPageData,
 } from './types';
-import type { BusinessData } from './types';
+import type { BusinessData, ChannelId, ChannelTestResult } from './types';
 import type {
   AlertRule, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleTestResult, Silence,
   SilenceInput,
@@ -110,6 +110,9 @@ export const api = {
   settings: (): Promise<SettingsData> => (config.useMocks ? fromMock(mock.settings) : request('/settings')),
   updateSettings: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>): Promise<void> =>
     config.useMocks ? fromMock(() => mock.updateSettings(patch)) : request('/settings', { method: 'PATCH', body: json(patch) }),
+  /** Sends one test message through a channel. A failed delivery comes back as `{ ok: false }`, not as an error. */
+  testChannel: (id: ChannelId): Promise<ChannelTestResult> =>
+    config.useMocks ? fromMock(() => mock.testChannel(id)) : request(`/settings/channels/${id}/test`, { method: 'POST' }),
 
   // Reliability: SLOs, incidents and the public status page.
   slos: (): Promise<SloData> => (config.useMocks ? fromMock(reliability.slos) : request('/slos')),

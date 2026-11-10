@@ -42,10 +42,17 @@ with an injected `fetch` and clock so it is tested without a network:
   (slow after 3 s, offline after 10 s); sources reported by the Control Room keep the status of its
   last poll. Going offline opens an incident.
 
+**Notifications** — `collector/src/notify`. One sender per channel (Discord webhook, Telegram Bot API
+`sendMessage`, ntfy as JSON, SMTP through nodemailer), each configured by its own `NW_*` variables and
+off until they are set. A periodic task compares the incidents in the store with what it already
+delivered and sends what is owed: "firing" when an incident opens, "resolved" when it closes. Because
+that record is stored, a restart neither repeats nor loses a notification. Targets never pass through
+the API, and no error text carries one.
+
 **Storage** — one SQLite file through Node's built-in `node:sqlite` (no native module to compile).
 It keeps log lines (each with a stored id, so deep links stay valid), health checks, metric samples,
 the last-known state of heartbeat sources, incidents, and what the dashboard writes (settings,
-acknowledgements, rule toggles, and a snapshot of the alerting and incident state — rules, silences,
+acknowledgements, rule toggles, channel switches, which notifications were delivered, and a snapshot of the alerting and incident state — rules, silences,
 maintenance windows, escalation policies, notes, declared incidents — taken after every write and
 loaded at start). Retention is per kind — logs, metrics, heartbeats — and follows the
 values chosen on the Settings page; pruning runs at start, every `NW_PRUNE_INTERVAL_MS`, and whenever
@@ -78,7 +85,7 @@ built with `VITE_USE_MOCKS=false`, served by nginx, which proxies `/api` to the 
   inventory), authenticated with a per-node token. Until then Settings → Agents is sample data.
 - **FinVault business data**: top-ups, payments, transactions and request rates from FinVault's
   gateway events (`bank.payment.*` and `events.<type>` keys on the same exchange).
-- **Alert rule evaluation and notification delivery** (Discord, Telegram, SMTP, ntfy).
+- **Alert rule evaluation**, and with it escalation steps, silences and maintenance windows acting on delivery.
 
 - **Business view** (`/business`): the collector would read the Billing Bridge's top-up ledger, credit
   ledger, standing and suspensions (hosted edition only), watch `payment.request` and FinVault's

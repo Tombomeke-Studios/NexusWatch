@@ -441,8 +441,18 @@ export interface Channel {
   id: ChannelId;
   name: string;
   description: string;
+  /** Where it sends to, masked: the real target is a secret that lives in the backend's configuration. */
   target: string;
+  /** False while the backend has no target for it; then `target` says what to set. */
+  configured: boolean;
   enabled: boolean;
+}
+
+/** Answer of `POST /settings/channels/:id/test`. A failed delivery is a result, not an HTTP error. */
+export interface ChannelTestResult {
+  ok: boolean;
+  /** "Delivered", or why not — never contains the target. */
+  detail: string;
 }
 
 export interface SettingsData {

@@ -49,6 +49,14 @@ describe('mock data', () => {
     expect(a.history.find((h) => h.alertId === 'al_1')?.notes).toHaveLength(1);
   });
 
+  it('marks every sample channel configured and answers a channel test without sending', () => {
+    for (const c of mock.settings().channels) {
+      expect(c.configured).toBe(true);
+      expect(mock.testChannel(c.id)).toMatchObject({ ok: true });
+    }
+    expect(() => mock.testChannel('fax')).toThrow(expect.objectContaining({ status: 404 }));
+  });
+
   it('routes every severity to every configured channel, Telegram included', () => {
     const s = mock.settings();
     const ids = s.channels.map((c) => c.id);
