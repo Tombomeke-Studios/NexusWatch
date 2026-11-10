@@ -4,10 +4,7 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-### `feature/notification-delivery`
-- [x] Channel senders: Discord webhook, Telegram Bot API, ntfy, SMTP — targets from `NW_*` variables, masked in Settings (#—)
-- [x] Notify once when an incident opens and once when it closes, by severity routing; retries, delivery log lines, no repeat after a restart (#—)
-- [x] "Send test" per channel: `POST /settings/channels/:id/test`, outcome shown next to the channel (#—)
+_(no active branch)_
 
 ## Backlog
 
@@ -70,6 +67,11 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
+### `feature/notification-delivery` — merged into `dev`
+- [x] Channel senders: Discord webhook, Telegram Bot API, ntfy, SMTP — targets from `NW_*` variables, masked in Settings (#—)
+- [x] Notify once when an incident opens and once when it closes, by severity routing; retries, delivery log lines, no repeat after a restart (#—)
+- [x] "Send test" per channel: `POST /settings/channels/:id/test`, outcome shown next to the channel (#—)
+
 ### `feature/collector-persistence` — merged into `dev`
 - [x] Alerting and incident writes survive a collector restart: snapshot of the sample modules' state in SQLite after every write, restored at start (#—)
 - [x] `POST /alerts/:id/ack` keeps the note and the time in sample mode, 404 for an alert that is not active (#—)
