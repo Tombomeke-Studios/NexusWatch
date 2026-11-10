@@ -4,9 +4,7 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-### `feature/collector-persistence`
-- [x] Alerting and incident writes survive a collector restart: snapshot of the sample modules' state in SQLite after every write, restored at start (#—)
-- [x] `POST /alerts/:id/ack` keeps the note and the time in sample mode, 404 for an alert that is not active (#—)
+_(no active branch)_
 
 ## Backlog
 
@@ -67,6 +65,10 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
+### `feature/collector-persistence` — merged into `dev`
+- [x] Alerting and incident writes survive a collector restart: snapshot of the sample modules' state in SQLite after every write, restored at start (#—)
+- [x] `POST /alerts/:id/ack` keeps the note and the time in sample mode, 404 for an alert that is not active (#—)
+
 ### `feature/collector-sampled-endpoints` — merged into `dev`
 - [x] Collector serves every endpoint the dashboard calls: business, SLOs, incidents, `/status`, alerting writes (sample-backed) (#—)
 - [x] Reliability mocks return 404/409/400 as documented instead of a bare error (500 through the collector) (#—)
