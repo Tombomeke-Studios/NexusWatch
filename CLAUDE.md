@@ -175,8 +175,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `api/client.ts` | `request()` — the one fetch wrapper (JSON, `ApiError` with status, 0 = no answer) + `buildUrl` |
 | `api/endpoints.ts` | `api.*` — every backend call; each picks mock or HTTP from `config.useMocks` |
 | `api/queries.ts` | React Query hooks (`useOverview`, `useLogs`, …) + mutations. **Pages read data only through these.** Live views poll every `VITE_REFRESH_MS` |
-| `api/mock/data.ts` | Sample data ported from the design, seeded so it is stable; timestamps relative to now; in-memory state for toggles/acks |
-| `api/mock/reliability.ts` | Sample SLO tallies, the in-memory incident store (create / update / resolve; Heartbeats lists the same incidents) and the public status page. Reads `services` from `data.ts` only inside functions — the two modules import each other |
+| `api/mock/data.ts` | Sample data ported from the design, seeded so it is stable; timestamps relative to now; in-memory state for toggles/acks, exported and restored as plain JSON by `alertingState()` / `restoreAlertingState()` |
+| `api/mock/reliability.ts` | Sample SLO tallies, the in-memory incident store (create / update / resolve; Heartbeats lists the same incidents; `incidentState()` / `restoreIncidentState()` snapshot it) and the public status page. Reads `services` from `data.ts` only inside functions — the two modules import each other |
 | `lib/series.ts` | Pure chart maths: `rng`, `walk`, `linePath`, `areaPath`, `stats`, `barHeights` |
 | `lib/format.ts` | Display formatting: euros, percent, latency (`timeout` for null), durations, bytes, `formatClock`, `formatWhen` |
 | `lib/status.ts` | Status/level/severity/project → colour, pill class and label maps |
@@ -224,7 +224,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
 | `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
-| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business, SLOs, incidents, `/status` and the alerting writes — sample generators only, state in memory, not SQLite) |
+| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business, SLOs, incidents, `/status` and the alerting writes — sample generators), `persist` (snapshots the sample modules' alerting and incident state into SQLite after each write; `createCtx` restores it) |
 | `contract.test.ts` | The mock invariants over HTTP, sample mode and live mode |
 | `../Dockerfile` · `../targets.example.json` | Collector image (repo-root context); example health-target list |
 
@@ -260,6 +260,9 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   in `collector/src/contract.test.ts` — otherwise the page 404s with `VITE_USE_MOCKS=false`.
 - **Mocks signal errors with `ApiError(status)`, never a bare `Error`.** The collector passes the status
   through; a bare `Error` becomes a 500 instead of the 404/409/400 that docs/api.md promises.
+- **New mutable state in a mock module must join its snapshot** (`alertingState()` in `data.ts`,
+  `incidentState()` in `reliability.ts`) — the collector persists exactly that snapshot, so anything
+  left out is lost on restart. A sampled write route must go through `run(ctx, …)` so it is saved.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in
   `queries.ts`; never call `fetch` from a page.

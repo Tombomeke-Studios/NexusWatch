@@ -90,8 +90,9 @@ export const routes: Route[] = [
   {
     method: 'POST',
     path: '/alerts/:id/ack',
-    handle: (ctx, { params }) => {
-      acknowledge(ctx, params.id);
+    handle: (ctx, { params, body }) => {
+      const note = (body as { note?: unknown } | null)?.note;
+      acknowledge(ctx, params.id, typeof note === 'string' ? note : '');
       return null;
     },
   },

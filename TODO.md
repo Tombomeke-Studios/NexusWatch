@@ -4,12 +4,16 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-_(no active branch)_
+### `feature/collector-persistence`
+- [x] Alerting and incident writes survive a collector restart: snapshot of the sample modules' state in SQLite after every write, restored at start (#—)
+- [x] `POST /alerts/:id/ack` keeps the note and the time in sample mode, 404 for an alert that is not active (#—)
 
 ## Backlog
 
 ### Backend (collector follow-ups)
-- [ ] Persist the sample-backed endpoints (incidents, rules, silences, maintenance, escalation) in SQLite, then feed SLOs, `/status` and Business from live sources (#—)
+- [ ] Feed SLOs, `/status` and Business from live sources (#—)
+- [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
+- [ ] Live mode: acknowledging keeps no note or time yet, and silences/maintenance windows do not apply to live alerts (#—)
 - [ ] Deliver notifications: Discord webhook, Telegram Bot API `sendMessage`, SMTP, ntfy — and the "Send test" button (#—)
 - [ ] Evaluate alert rules (today every open incident is an active alert; rules are the sample set + stored toggles) (#—)
 - [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)

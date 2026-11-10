@@ -543,6 +543,46 @@ export function deletePolicy(id: string): void {
   for (const r of rules) if (r.escalationPolicyId === id) r.escalationPolicyId = null;
 }
 
+/**
+ * Everything the alerting writes change, as plain JSON. The collector stores it so rules, silences,
+ * maintenance windows, policies, acknowledgements and notes survive a restart.
+ */
+export interface AlertingState {
+  idCounter: number;
+  policies: EscalationPolicy[];
+  rules: AlertRule[];
+  silences: Silence[];
+  maintenance: MaintenanceWindow[];
+  acknowledgedAt: [alertId: string, at: string][];
+  resolvedAt: [alertId: string, at: string][];
+  notes: [alertId: string, notes: AlertNote[]][];
+}
+
+export function alertingState(): AlertingState {
+  return structuredClone({
+    idCounter, policies, rules, silences, maintenance,
+    acknowledgedAt: [...acknowledgedAt], resolvedAt: [...resolvedAt], notes: [...alertNotes],
+  });
+}
+
+const refill = <K, V>(map: Map<K, V>, entries: [K, V][]) => {
+  map.clear();
+  for (const [k, v] of entries) map.set(k, v);
+};
+
+/** Replaces the alerting state with a snapshot from `alertingState()`. */
+export function restoreAlertingState(state: AlertingState): void {
+  const s = structuredClone(state);
+  idCounter = Math.max(idCounter, s.idCounter);
+  policies.splice(0, policies.length, ...s.policies);
+  rules.splice(0, rules.length, ...s.rules);
+  silences.splice(0, silences.length, ...s.silences);
+  maintenance.splice(0, maintenance.length, ...s.maintenance);
+  refill(acknowledgedAt, s.acknowledgedAt);
+  refill(resolvedAt, s.resolvedAt);
+  refill(alertNotes, s.notes);
+}
+
 // ── Service detail ─────────────────────────────────────────────────────
 export function serviceDetail(id: string): ServiceDetail | null {
   const service = byId(id);

@@ -101,8 +101,15 @@ lists which parts are live.
 
 Business, SLOs, incidents, `/status` and the alerting writes (rules, silences, maintenance windows,
 escalation policies, resolving an alert) have no live source yet: the collector answers them from the
-sample generators, and their state lives in memory until a restart. Errors keep the statuses in the
-tables above (404 unknown, 409 already resolved, 400 invalid input).
+sample generators. What the writes change — rules, silences, maintenance windows, escalation policies,
+acknowledgements with their notes, resolutions, declared incidents and their updates — is stored after
+every successful write and loaded again at start, so it survives a restart. Nothing is stored before
+the first write; from then on the stored incidents and windows keep the times they had at that moment
+instead of moving with the clock. Errors keep the statuses in the tables above (404 unknown, 409
+already resolved, 400 invalid input), and a refused write stores nothing.
+
+Without a live source, `POST /alerts/:id/ack` keeps the note and the time of acknowledgement, and
+answers 404 for an alert that is not active.
 
 Rules the live answers follow, beyond the shapes:
 
