@@ -492,23 +492,26 @@ export function deleteSilence(id: string): void {
   if (i >= 0) silences.splice(i, 1);
 }
 
-function checkWindow(input: MaintenanceInput): MaintenanceInput {
+/** The services a window may be scoped to. The collector passes the monitored ones; the sample has its own. */
+type KnownServices = readonly { id: string; project: ProjectId }[];
+
+function checkWindow(input: MaintenanceInput, known: KnownServices): MaintenanceInput {
   const first = Object.values(validateWindow(input))[0];
   if (first) throw invalid(first);
-  if (input.serviceId && byId(input.serviceId)?.project !== input.project) throw invalid('That service is not part of this project');
+  if (input.serviceId && known.find((s) => s.id === input.serviceId)?.project !== input.project) throw invalid('That service is not part of this project');
   return { ...input, title: input.title.trim(), startsAt: new Date(input.startsAt).toISOString() };
 }
 
-export function createMaintenance(input: MaintenanceInput): MaintenanceWindow {
-  const w = { id: nextId('mw'), ...checkWindow(input) };
+export function createMaintenance(input: MaintenanceInput, known: KnownServices = services): MaintenanceWindow {
+  const w = { id: nextId('mw'), ...checkWindow(input, known) };
   maintenance.push(w);
   return { ...w };
 }
 
-export function updateMaintenance(id: string, input: MaintenanceInput): MaintenanceWindow {
+export function updateMaintenance(id: string, input: MaintenanceInput, known: KnownServices = services): MaintenanceWindow {
   const i = maintenance.findIndex((w) => w.id === id);
   if (i < 0) throw new ApiError(404, `Maintenance window ${id} not found`);
-  maintenance[i] = { id, ...checkWindow(input) };
+  maintenance[i] = { id, ...checkWindow(input, known) };
   return { ...maintenance[i] };
 }
 

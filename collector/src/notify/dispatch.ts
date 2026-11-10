@@ -11,6 +11,7 @@ import type { ChannelId, ChannelTestResult } from '../contract.js';
 import type { Task } from '../sources/types.js';
 import type { IncidentRow } from '../store.js';
 import { DAY_MS, iso, type Ctx } from '../views/ctx.js';
+import { suppression, suppressors } from '../views/alerts.js';
 import { settings } from '../views/settings.js';
 import { CHANNEL_IDS, send, type Message } from './channels.js';
 
@@ -80,9 +81,13 @@ export async function notifyOnce(ctx: Ctx): Promise<void> {
   const state = ctx.store.get<State>(STATE) ?? {};
   const known = new Map(ctx.store.incidents(now - 90 * DAY_MS).map((i) => [i.id, i]));
 
+  const by = suppressors(ctx);
   for (const i of known.values()) {
     if (i.endedAt !== null) continue;
     const entry = (state[i.id] ??= { firing: { sent: [], attempts: 0 } });
+    // Held, not dropped: if the alert is still open when the silence or window ends, it is sent then.
+    const held = suppression(ctx, i, by);
+    if (held.silenceId || held.maintenanceId) continue;
     await deliver(ctx, i, 'firing', channelsFor(ctx, i.severity), entry.firing);
   }
 

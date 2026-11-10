@@ -120,12 +120,25 @@ already resolved, 400 invalid input), and a refused write stores nothing.
 Without a live source, `POST /alerts/:id/ack` keeps the note and the time of acknowledgement, and
 answers 404 for an alert that is not active.
 
+**Rule evaluation.** With a live source the collector evaluates every enabled rule on an interval
+(`NW_RULES_INTERVAL_MS`), with the semantics of `lib/rules.ts`. Metrics with a source: `latency` per
+monitored service, `cpu`, `memory` and `disk` per node. `queue_depth`, `error_rate` and `topups` have
+none yet — their rules have no targets and never fire. `heartbeat` rules are not evaluated: the health
+checker raises an outage after `NW_HEALTH_FAILURES_FOR_INCIDENT` failed checks, under the stored
+"Service down" rule of the project. An alert a rule raised carries that rule's id, its condition as
+`rule`, the current measurement as `value` and the recent samples as `trend`; it resolves when the
+condition clears, or when the rule is switched off or deleted. `silenceId` and `maintenanceId` are set
+on live alerts too (a silence on the rule; a window on the project or the service), `AlertsData.services`
+lists the monitored services, and `POST /alert-rules/test` evaluates against the live measurements
+(422 for a malformed condition).
+
 **Notifications.** With a live source the collector notifies when an incident opens and again when
 it closes, through every channel that the incident's severity is routed to, is switched on and has a
 target. Each message is sent once: what was delivered is stored, so a restart does not repeat it; a
 channel that fails is retried on the next run, five times at most, and every delivery or failure is a
 log line of the `collector` service. The all-clear only goes to channels the alarm reached. Sample
-alerts never notify. Escalation steps, silences and maintenance windows do not affect delivery yet.
+alerts never notify. A notification is held while the alert's rule is silenced or a maintenance window covers it, and sent
+when that ends if the alert is still open. Escalation steps do not affect delivery yet.
 
 Rules the live answers follow, beyond the shapes:
 

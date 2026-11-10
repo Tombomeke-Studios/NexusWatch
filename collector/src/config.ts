@@ -36,6 +36,8 @@ export interface Config {
   metrics: { targets: MetricsTarget[]; intervalMs: number; token: string | undefined };
   bus: { url: string; queue: string } | null;
   pruneIntervalMs: number;
+  /** How often alert rules are evaluated against the stored measurements. */
+  rulesIntervalMs: number;
   /** Where notifications go. A channel without its variable(s) is off. */
   notify: { targets: NotifyTargets; intervalMs: number; timeoutMs: number; publicUrl: string | null };
 }
@@ -177,6 +179,7 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
     },
     bus: env.NW_RABBITMQ_URL ? { url: env.NW_RABBITMQ_URL, queue: env.NW_RABBITMQ_QUEUE || 'nexuswatch.collector' } : null,
     pruneIntervalMs: num(env, 'NW_PRUNE_INTERVAL_MS', 3_600_000),
+    rulesIntervalMs: Math.max(1_000, num(env, 'NW_RULES_INTERVAL_MS', 15_000)),
     notify: {
       targets: notifyTargets(env),
       intervalMs: Math.max(1_000, num(env, 'NW_NOTIFY_INTERVAL_MS', 10_000)),

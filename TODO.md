@@ -4,18 +4,23 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-_(no active branch)_
+### `feature/rule-evaluation`
+- [x] Evaluate alert rules in the collector with `lib/rules.ts` semantics (for-duration, unknown ≠ 0): latency, CPU, memory, disk (#—)
+- [x] A firing rule opens an alert with its real rule id, current value and trend; it resolves when the condition clears or the rule is switched off or deleted (#—)
+- [x] Silences on a rule and maintenance windows apply to live alerts and hold their notifications (#—)
+- [x] `POST /alert-rules/test` evaluates against live data; maintenance windows can be scoped to monitored services (#—)
 
 ## Backlog
 
 ### Backend (collector follow-ups)
 - [ ] Feed SLOs, `/status` and Business from live sources (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
-- [ ] Live mode: acknowledging keeps no note or time yet, and silences/maintenance windows do not apply to live alerts (#—)
-- [ ] Notifications: run escalation policy steps, and hold delivery during silences and maintenance windows (needs rule evaluation) (#—)
+- [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
+- [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
 - [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
-- [ ] Evaluate alert rules (today every open incident is an active alert; rules are the sample set + stored toggles) (#—)
+- [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
+- [ ] Rule evaluation: let heartbeat rules own "service down" instead of the health checker's fixed failure count (#—)
 - [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
 - [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
 - [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
@@ -37,7 +42,6 @@ _(no active branch)_
 - [ ] Serve `/status` from a separate, unauthenticated origin once authentication lands; cache it (#—)
 - [ ] Service detail at 390 px: the 120-check strip (3 px gap) is ~600 px wide and scrolls the page sideways — existed before this branch (#—)
 
-- [ ] Evaluate alert rules server-side with the same semantics as `lib/rules.ts` (for-duration, unknown ≠ 0), honouring silences, maintenance windows and escalation policies (#—)
 - [ ] Storage with retention per data kind (logs / metrics / heartbeats) (#—)
 - [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
 

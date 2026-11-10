@@ -1,4 +1,5 @@
 /** Entry point: config → store → sources → HTTP. Everything here is wiring; logic lives in tested modules. */
+import { rulesTask } from './alerting/evaluate.js';
 import { loadConfig } from './config.js';
 import { notifyTask } from './notify/dispatch.js';
 import { createMailer } from './notify/mailer.js';
@@ -30,8 +31,8 @@ const ctx = createCtx(store, config, {
   tasks: () => scheduler.snapshot(),
   mail: email ? createMailer(email.smtpUrl, config.notify.timeoutMs) : null,
 });
-// Notifications only make sense for real incidents, so the task exists only with a live source.
-if (ctx.live.logs) tasks.push(notifyTask(ctx));
+// Rules and notifications only make sense for real measurements, so both exist only with a live source.
+if (ctx.live.logs) tasks.push(rulesTask(ctx), notifyTask(ctx));
 const scheduler: Scheduler = new Scheduler(tasks, clock, (task, error) => console.warn(`[collector] ${task}: ${error}`));
 
 // Retention: once at start, then on an interval (and whenever Settings changes it).
