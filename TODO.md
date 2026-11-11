@@ -4,15 +4,18 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 
 ## Active
 
-_(no active branch)_
+### `feature/escalation`
+- [x] Escalation policy steps add their channels as they come due, until the alert is acknowledged; one message per channel (#—)
+- [x] Retries are counted per channel, so a channel that is down does not hold back a later step (#—)
+- [x] Acknowledging a live alert keeps its time and note, and answers 404 for an alert that is not open (#—)
 
 ## Backlog
 
 ### Backend (collector follow-ups)
 - [ ] Feed SLOs, `/status` and Business from live sources (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
-- [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
-- [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
+- [ ] Live mode: muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts; resolving by hand and its note too (#—)
+- [ ] Notifications: decide what a rule's own `channels` list means next to severity routing and escalation, then use it for delivery (#—)
 - [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
 - [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)

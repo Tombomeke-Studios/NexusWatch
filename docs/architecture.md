@@ -54,7 +54,8 @@ and the heartbeat tracker, which open "not responding" / "offline" themselves.
 `sendMessage`, ntfy as JSON, SMTP through nodemailer), each configured by its own `NW_*` variables and
 off until they are set. A periodic task compares the incidents in the store with what it already
 delivered and sends what is owed: "firing" when an incident opens, "resolved" when it closes. Because
-that record is stored, a restart neither repeats nor loses a notification. Targets never pass through
+that record is stored, a restart neither repeats nor loses a notification. While an alert stays
+unacknowledged, the steps of its rule's escalation policy add their channels as they come due. Targets never pass through
 the API, and no error text carries one.
 
 **Storage** — one SQLite file through Node's built-in `node:sqlite` (no native module to compile).
@@ -93,7 +94,7 @@ built with `VITE_USE_MOCKS=false`, served by nginx, which proxies `/api` to the 
   inventory), authenticated with a per-node token. Until then Settings → Agents is sample data.
 - **FinVault business data**: top-ups, payments, transactions and request rates from FinVault's
   gateway events (`bank.payment.*` and `events.<type>` keys on the same exchange).
-- **Escalation policy steps** acting on delivery, and sources for the FinVault rule metrics (queue depth, 5xx rate, top-ups).
+- **Sources for the FinVault rule metrics** (queue depth, 5xx rate, top-ups).
 
 - **Business view** (`/business`): the collector would read the Billing Bridge's top-up ledger, credit
   ledger, standing and suspensions (hosted edition only), watch `payment.request` and FinVault's
