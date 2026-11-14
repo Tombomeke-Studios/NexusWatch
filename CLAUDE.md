@@ -15,17 +15,11 @@ When the design and this repo disagree on look or layout, the design wins; on be
 
 ## 0. Where we are — read this first
 
-**Phase 0 — concept not yet approved.** The idea is still waiting for sign-off, so:
-
-| Rule | Why |
-|---|---|
-| **Local git only. Never `git push`, never create a GitHub repo, never add a remote** unless the user says so in chat, for that moment. | Publishing an unapproved project is not reversible in practice. |
-| **No GitHub issues yet.** TODO items carry `(#—)` until the repo exists. | Issues need a repo. |
-| Commit normally (small, conventional commits) on the local branches below. | So history is ready to push the day it is approved. |
-
-**The day a remote is approved** (one-off, in this order): create the repo → push `main`, `staging`, `dev`
-and open feature branches → set default branch to `dev` → create an issue for every open TODO item and
-replace each `(#—)` with its `(#N)` → from then on, sections 2a and 2b apply in full, including pushing.
+**Approved and public** at [Tombomeke-Studios/NexusWatch](https://github.com/Tombomeke-Studios/NexusWatch)
+(default branch `dev`). Sections 2a and 2b apply in full: every open TODO item has an issue, feature
+branches are pushed and reach `dev` through a PR, and merging a PR still needs the user's go-ahead in chat.
+`(#—)` on a Done item means it was finished before the repo existed. There is no CI yet (#43), so run
+`npm run build && npm run lint && npm test` yourself before every push.
 
 **What exists:** every page from the design, routed, wired to React Query hooks; the `collector`
 workspace serving every path of [docs/api.md](docs/api.md) (health checks, Control Room, Prometheus
