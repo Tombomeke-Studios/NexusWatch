@@ -5,9 +5,9 @@ Progress per branch. `(#—)` = no GitHub issue yet (no remote until the concept
 ## Active
 
 ### `feature/escalation`
-- [x] Escalation policy steps add their channels as they come due, until the alert is acknowledged; one message per channel (#—)
-- [x] Retries are counted per channel, so a channel that is down does not hold back a later step (#—)
-- [x] Acknowledging a live alert keeps its time and note, and answers 404 for an alert that is not open (#—)
+- [x] Escalation policy steps add their channels as they come due, until the alert is acknowledged; one message per channel (#44)
+- [x] Retries are counted per channel, so a channel that is down does not hold back a later step (#45)
+- [x] Acknowledging a live alert keeps its time and note, and answers 404 for an alert that is not open (#46)
 
 ## Backlog
 
