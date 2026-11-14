@@ -6,7 +6,8 @@
  */
 import { formatCondition, windowCovers } from '../../../dashboard/src/lib/rules.js';
 import { currentReading, parseSubject } from '../alerting/evaluate.js';
-import type { ActiveAlert, AlertRule, AlertsData, Incident, MaintenanceWindow, Silence } from '../contract.js';
+import type { ActiveAlert, AlertNote, AlertRule, AlertsData, Incident, MaintenanceWindow, Silence } from '../contract.js';
+import { HttpError } from '../routes.js';
 import type { IncidentRow } from '../store.js';
 import { DAY_MS, iso, seconds, type Ctx } from './ctx.js';
 import { saveState } from './persist.js';
@@ -24,22 +25,41 @@ export function incidents(ctx: Ctx): Incident[] {
   return ctx.store.incidents(now - 90 * DAY_MS).map((i) => toIncident(i, now));
 }
 
-function acknowledged(ctx: Ctx): Set<string> {
-  return new Set(ctx.store.get<string[]>(ACKS) ?? []);
+interface Ack {
+  /** Null for acknowledgements stored before the time was kept. */
+  at: string | null;
+  note: string;
 }
+
+/** Acknowledgements by alert id. Older stores hold a plain list of ids. */
+function acks(ctx: Ctx): Map<string, Ack> {
+  const stored = ctx.store.get<string[] | Record<string, Ack>>(ACKS) ?? {};
+  return Array.isArray(stored) ? new Map(stored.map((id) => [id, { at: null, note: '' }])) : new Map(Object.entries(stored));
+}
+
+/** When a live alert was acknowledged (ms), or null: not acknowledged, or the time was not kept. */
+export function acknowledgedAt(ctx: Ctx, id: string): number | null {
+  const at = acks(ctx).get(id)?.at;
+  return at ? Date.parse(at) : null;
+}
+
+const ackNotes = (id: string, ack: Ack | undefined): AlertNote[] => (ack?.at ? [{ id: `${id}-ack`, kind: 'acknowledged', text: ack.note, at: ack.at }] : []);
 
 /**
  * Sample alerts are acknowledged in the sample module (which keeps the time and the note; 404 when
- * the alert is not active) and snapshotted; live alerts only record that they were acknowledged.
+ * the alert is not active) and snapshotted. A live alert must be an open incident (404 otherwise);
+ * its first acknowledgement is kept with its time and note, which also stops the escalation.
  */
 export function acknowledge(ctx: Ctx, id: string, note = ''): void {
   if (!ctx.live.logs) {
     ctx.sample.acknowledgeAlert(id, note);
     saveState(ctx.store);
+  } else if (!ctx.store.incidents(ctx.clock()).some((i) => i.id === id && i.endedAt === null)) {
+    throw new HttpError(404, `Alert ${id} is not active`);
   }
-  const acks = acknowledged(ctx);
-  acks.add(id);
-  ctx.store.set(ACKS, [...acks]);
+  const all = acks(ctx);
+  if (!all.has(id)) all.set(id, { at: iso(ctx.clock()), note: note.trim() });
+  ctx.store.set(ACKS, Object.fromEntries(all));
 }
 
 export function rules(ctx: Ctx): AlertRule[] {
@@ -84,7 +104,7 @@ export function suppression(ctx: Ctx, i: IncidentRow, by: Suppressors = suppress
 }
 
 function activeFromIncidents(ctx: Ctx, now: number, by: Suppressors, ruleSet: AlertRule[]): ActiveAlert[] {
-  const acks = acknowledged(ctx);
+  const acked = acks(ctx);
   return ctx.store
     .incidents(now)
     .filter((i) => i.endedAt === null)
@@ -117,19 +137,18 @@ function activeFromIncidents(ctx: Ctx, now: number, by: Suppressors, ruleSet: Al
         durationSeconds: seconds(now - i.startedAt),
         value: measured ? measured.value : target.isService ? 'timeout' : 'offline',
         trend,
-        acknowledged: acks.has(i.id),
-        // Not tracked live yet: when it was acknowledged, and notes.
-        acknowledgedAt: null,
+        acknowledged: acked.has(i.id),
+        acknowledgedAt: acked.get(i.id)?.at ?? null,
         ...suppression(ctx, i, by),
-        notes: [],
+        notes: ackNotes(i.id, acked.get(i.id)),
       };
     });
 }
 
 export function activeAlerts(ctx: Ctx): ActiveAlert[] {
   if (!ctx.live.logs) {
-    const acks = acknowledged(ctx);
-    return ctx.sample.alerts().active.map((a) => ({ ...a, acknowledged: a.acknowledged || acks.has(a.id) }));
+    const acked = acks(ctx);
+    return ctx.sample.alerts().active.map((a) => ({ ...a, acknowledged: a.acknowledged || acked.has(a.id) }));
   }
   return activeFromIncidents(ctx, ctx.clock(), suppressors(ctx), rules(ctx));
 }
@@ -139,6 +158,7 @@ export function alerts(ctx: Ctx): AlertsData {
   const now = ctx.clock();
   const base = ctx.sample.alerts();
   const active = activeFromIncidents(ctx, now, base, rules(ctx));
+  const acked = acks(ctx);
   const month = ctx.store.incidents(now - 30 * DAY_MS);
   const resolved = month.filter((i) => i.endedAt !== null);
   const resolved24h = resolved.filter((i) => (i.endedAt as number) >= now - DAY_MS).length;
@@ -169,7 +189,7 @@ export function alerts(ctx: Ctx): AlertsData {
       severity: i.severity,
       startedAt: iso(i.startedAt),
       durationSeconds: seconds((i.endedAt ?? now) - i.startedAt),
-      notes: [],
+      notes: ackNotes(i.id, acked.get(i.id)),
     })),
   };
 }

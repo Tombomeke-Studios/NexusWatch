@@ -3,8 +3,9 @@ import { loadConfig } from '../config.js';
 import type { Fetch } from '../sources/types.js';
 import { Store } from '../store.js';
 import { createCtx } from '../views/ctx.js';
+import { acknowledge, alerts } from '../views/alerts.js';
 import { updateSettings } from '../views/settings.js';
-import { MAX_ATTEMPTS, channelsFor, notifyOnce, testChannel } from './dispatch.js';
+import { MAX_ATTEMPTS, channelsFor, escalatedChannels, notifyOnce, testChannel } from './dispatch.js';
 
 const ENV = {
   // A health target makes the collector "live": only then are incidents real.
@@ -122,5 +123,114 @@ describe('testChannel', () => {
     expect(await testChannel(t.ctx, 'telegram')).toEqual({ ok: false, detail: expect.stringContaining('NW_TELEGRAM_BOT_TOKEN') });
     expect(await testChannel(t.ctx, 'carrier-pigeon')).toBeNull();
     expect(t.calls).toHaveLength(0);
+  });
+});
+
+// A warning on a FinVault service: routed to Discord only, and its rule (r2, "Service down") escalates
+// through the On-call policy — Discord at once, Telegram after 5 min (no target here), push after 15 min.
+describe('escalation', () => {
+  const hosts = (calls: { url: string }[]) => calls.map((c) => new URL(c.url).host);
+  const MIN = 60_000;
+
+  it('adds a policy step when it comes due, once', async () => {
+    const t = setup();
+    t.open('warning');
+    await notifyOnce(t.ctx);
+    expect(hosts(t.calls)).toEqual(['discord.com']);
+
+    t.tick(14 * MIN);
+    await notifyOnce(t.ctx);
+    expect(t.calls).toHaveLength(1);
+
+    t.tick(1 * MIN);
+    await notifyOnce(t.ctx);
+    await notifyOnce(t.ctx);
+    expect(hosts(t.calls)).toEqual(['discord.com', 'ntfy.sh']);
+    expect(titles(t.calls)[1]).toBe('[WARNING] invoice-service is not responding');
+  });
+
+  it('skips the steps that were not due yet when the alert is acknowledged', async () => {
+    const t = setup();
+    const incident = t.open('warning');
+    await notifyOnce(t.ctx);
+    t.tick(10 * MIN);
+    acknowledge(t.ctx, incident.id, 'Restarting it');
+    t.tick(30 * MIN);
+    await notifyOnce(t.ctx);
+    expect(hosts(t.calls)).toEqual(['discord.com']);
+  });
+
+  it('still delivers a step that was due before the acknowledgement', async () => {
+    const t = setup(ENV, (url) => (url.includes('ntfy') ? new Response('{}', { status: 503 }) : new Response('{}')));
+    const incident = t.open('warning');
+    t.tick(16 * MIN);
+    await notifyOnce(t.ctx);
+    // Push was due and failed; acknowledging afterwards does not cancel the retry.
+    acknowledge(t.ctx, incident.id);
+    await notifyOnce(t.ctx);
+    expect(hosts(t.calls)).toEqual(['discord.com', 'ntfy.sh', 'ntfy.sh']);
+  });
+
+  it('sends the all-clear to every channel the alarm reached, escalated ones included', async () => {
+    const t = setup();
+    t.open('warning');
+    t.tick(15 * MIN);
+    await notifyOnce(t.ctx);
+    t.close();
+    await notifyOnce(t.ctx);
+    expect(titles(t.calls.slice(2)).sort()).toEqual(['[RESOLVED] invoice-service is not responding', '[RESOLVED] invoice-service is not responding']);
+  });
+
+  it('does not escalate through a channel that is switched off', async () => {
+    const t = setup();
+    updateSettings(t.ctx, { channels: [{ id: 'push', enabled: false }] as never });
+    expect(escalatedChannels(t.ctx, t.open('warning'))).toEqual(['discord']);
+    t.tick(20 * MIN);
+    await notifyOnce(t.ctx);
+    expect(hosts(t.calls)).toEqual(['discord.com']);
+  });
+
+  it('gives up on one channel without holding back a later step', async () => {
+    const t = setup(ENV, (url) => (url.includes('discord') ? new Response('{}', { status: 500 }) : new Response('{}')));
+    t.open('warning');
+    for (let i = 0; i < MAX_ATTEMPTS + 2; i++) await notifyOnce(t.ctx);
+    expect(t.calls).toHaveLength(MAX_ATTEMPTS);
+    t.tick(15 * MIN);
+    await notifyOnce(t.ctx);
+    expect(hosts(t.calls).at(-1)).toBe('ntfy.sh');
+  });
+
+  it('reads delivery state written before attempts were counted per channel', async () => {
+    const t = setup();
+    const incident = t.open('warning');
+    t.store.set('notify.state', { [incident.id]: { firing: { sent: ['discord'], attempts: 1 } } });
+    await notifyOnce(t.ctx);
+    expect(t.calls).toHaveLength(0);
+  });
+});
+
+describe('acknowledging a live alert', () => {
+  it('keeps the time and the note of the first acknowledgement, and refuses an alert that is not open', () => {
+    const t = setup();
+    const incident = t.open('warning');
+    t.tick(3 * 60_000);
+    acknowledge(t.ctx, incident.id, ' On it ');
+    t.tick(60_000);
+    acknowledge(t.ctx, incident.id, 'Again');
+    const a = alerts(t.ctx);
+    const alert = a.active.find((x) => x.id === incident.id)!;
+    expect(alert.acknowledged).toBe(true);
+    expect(Date.parse(alert.acknowledgedAt!) - incident.startedAt).toBe(3 * 60_000);
+    expect(alert.notes).toMatchObject([{ kind: 'acknowledged', text: 'On it' }]);
+    expect(a.history.find((h) => h.id === incident.id)?.notes).toHaveLength(1);
+    expect(() => acknowledge(t.ctx, 'inc_nope')).toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  it('still reads acknowledgements stored as a plain list of ids', () => {
+    const t = setup();
+    const incident = t.open('warning');
+    t.store.set('alerts.acknowledged', [incident.id]);
+    const alert = alerts(t.ctx).active.find((x) => x.id === incident.id)!;
+    expect(alert).toMatchObject({ acknowledged: true, acknowledgedAt: null, notes: [] });
   });
 });

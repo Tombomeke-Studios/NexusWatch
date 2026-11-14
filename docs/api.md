@@ -138,7 +138,19 @@ target. Each message is sent once: what was delivered is stored, so a restart do
 channel that fails is retried on the next run, five times at most, and every delivery or failure is a
 log line of the `collector` service. The all-clear only goes to channels the alarm reached. Sample
 alerts never notify. A notification is held while the alert's rule is silenced or a maintenance window covers it, and sent
-when that ends if the alert is still open. Escalation steps do not affect delivery yet.
+when that ends if the alert is still open.
+
+**Escalation.** When the alert's rule has an escalation policy, each step's channel is added once the
+step comes due (`afterMinutes` after the alert started), as long as the alert is open, not acknowledged
+before that moment, and the channel is switched on and has a target. Whether a step is due is decided
+by `escalationProgress` in `lib/rules.ts`, the function the dashboard draws the steps with. A channel
+gets the message once, whether routing, a step, or both ask for it; retries are counted per channel.
+An outage raised by the health checker escalates through the policy of the stored "Service down" rule
+of its project. A rule's own `channels` list is not used for delivery yet.
+
+**Acknowledging a live alert** (`POST /alerts/:id/ack`) answers 404 unless the alert is open. The first
+acknowledgement is kept with its time (`acknowledgedAt`) and its note (on the alert and its history
+entry); later ones change nothing.
 
 Rules the live answers follow, beyond the shapes:
 
