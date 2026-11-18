@@ -60,6 +60,16 @@ _(no active branch)_
 - [ ] Business: time range for the top-up window (7 days is fixed in the contract today) (#—)
 - [ ] Business: the collector must read the Billing Bridge only in the hosted edition and say so when it is community (#—)
 
+### Final Work (EhB, 2026–2027) — follow-ups found while planning
+- [ ] Watch FinVault's services as health and Prometheus targets once they expose `/health` and `/metrics` (FinVault TODO, observability) (#—)
+- [ ] Follow one reference across the chain: a trace view listing every event and log line that carries the same correlation id (needs the envelope field in NexusInfra and FinVault) (#—)
+- [ ] Capacity forecast: from stored node samples, when a node's disk or memory fills at the current trend; alert before it does (#—)
+- [ ] Business anomalies over time: top-ups or revenue far below the same hour last week raise an alert (#—)
+- [ ] Monthly uptime report per project — a printable page a hoster can send their customers (#—)
+- [ ] Status page per customer: a hoster shows each customer only the components their servers use (#—)
+- [ ] Phone notifications today: document ntfy's phone app as the quickest mobile push, before the NexusInfra app has its own (#—)
+- [ ] Service detail's "Restart container" contradicts the read-only rule (section 0 of CLAUDE.md) — replace it with a link to that server in the NexusInfra panel (#—)
+
 ### Agent (`feature/agent`)
 - [ ] `nexuswatch/agent` container from the Settings design: heartbeats, metrics, logs to the server (#—)
 
