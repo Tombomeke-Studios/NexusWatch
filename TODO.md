@@ -15,16 +15,13 @@ _(no active branch)_
 - [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
 - [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
-- [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
 - [ ] Rule evaluation: let heartbeat rules own "service down" instead of the health checker's fixed failure count (#—)
-- [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
 - [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
 - [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
 - [ ] Alerts for heartbeat sources link to `/services/<source>`, which 404s for nodes — link nodes to Heartbeats instead (#—)
 - [ ] Charts: align a live series that is shorter than the window to the right of the time axis (#—)
 - [ ] Heartbeats card says "every 30 s" — show the configured interval from the API (#—)
 - [ ] Host card shows sample "nodes connected" when no node source is configured — say "no node source" instead (#—)
-- [ ] Build and run the Docker images end to end (compose validated, images not built yet: Docker daemon was off) (#—)
 - [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
 - [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
 
@@ -42,7 +39,6 @@ _(no active branch)_
 - [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
 
 ### Dashboard
-- [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
 - [ ] Wire the "Coming soon" actions: add monitor, test check, rotate agent token (#—)
 - [ ] Alerting follow-ups: Overview's open-alert KPI is still hard-coded in the mock; Service detail's "Escalation" setting is static text — read both from `/alerts` (#—)
 - [ ] Alerting follow-ups: a rule has no per-service/queue scope yet (it covers every target of its project); add label filters like `service="…"` (#—)
@@ -60,21 +56,31 @@ _(no active branch)_
 - [ ] Business: time range for the top-up window (7 days is fixed in the contract today) (#—)
 - [ ] Business: the collector must read the Billing Bridge only in the hosted edition and say so when it is community (#—)
 
-### Final Work (EhB, 2026–2027) — follow-ups found while planning
+### Final Work (EhB, 2026–2027) — the MVP for the March showcase
+> The showcase in March is the deadline — nothing is built after it. NexusWatch stays a **web dashboard**:
+> it is for whoever runs the platform, who works at a computer; on a phone the existing narrow layout
+> covers it, and there is no native app. Owner: Tom. The MVP shows NexusInfra and FinVault side by side
+> (status, uptime), an incident timeline, FinVault as a real source (failed payments, top-ups per day) and
+> notifications when a service goes down.
 - [ ] Watch FinVault's services as health and Prometheus targets once they expose `/health` and `/metrics` (FinVault TODO, observability) (#—)
+- [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
+- [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
+- [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
+- [ ] Build and run the Docker images end to end (compose validated, images not built yet: Docker daemon was off) (#—)
+- [ ] CI workflow (build, lint, test) — the repository is on GitHub now (#—)
+- [ ] Join the combined stack: watch NexusInfra and FinVault as they run together through NexusInfra's `docker-compose.finvault.yml` (NexusInfra #428) (#—)
+- [ ] Service detail's "Restart container" contradicts the read-only rule (section 0 of CLAUDE.md) — replace it with a link to that server in the NexusInfra panel (#—)
+- [ ] Phone notifications today: document ntfy's phone app as the quickest mobile push, before the NexusInfra app has its own (#—)
+
+### Final Work — only once the MVP is done (still before March)
 - [ ] Follow one reference across the chain: a trace view listing every event and log line that carries the same correlation id (needs the envelope field in NexusInfra and FinVault) (#—)
 - [ ] Capacity forecast: from stored node samples, when a node's disk or memory fills at the current trend; alert before it does (#—)
 - [ ] Business anomalies over time: top-ups or revenue far below the same hour last week raise an alert (#—)
 - [ ] Monthly uptime report per project — a printable page a hoster can send their customers (#—)
 - [ ] Status page per customer: a hoster shows each customer only the components their servers use (#—)
-- [ ] Phone notifications today: document ntfy's phone app as the quickest mobile push, before the NexusInfra app has its own (#—)
-- [ ] Service detail's "Restart container" contradicts the read-only rule (section 0 of CLAUDE.md) — replace it with a link to that server in the NexusInfra panel (#—)
 
 ### Agent (`feature/agent`)
 - [ ] `nexuswatch/agent` container from the Settings design: heartbeats, metrics, logs to the server (#—)
-
-### Infra
-- [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 
 ## Done
 ### `feature/rule-evaluation` — merged into `dev`
