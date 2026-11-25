@@ -5,7 +5,8 @@
  * Stored samples (metric / series):
  * - `requests` / `<target>`        requests per second since the previous scrape
  * - `errors5xx` / `<target>`       5xx answers per second since the previous scrape
- * - `latency_p95` / `<target>`     p95 request duration in ms since the previous scrape
+ * - `latency_p95` / `<target>`     p95 request duration in ms since the previous scrape (not for the
+ *                                  gateway: it counts requests but has no duration histogram)
  * - `queues` / `dead-letters`      nexusinfra_dead_letters (only present when the broker answered)
  * - `queues` / `outbox <target>`   nexusinfra_outbox_pending
  * - `containers` / `<target>`      nexusinfra_agent_containers{state="running"}
@@ -24,6 +25,7 @@ export interface PromSample {
 /** The metric families the collector reads. */
 export const KEPT = new Set([
   'nexusinfra_http_requests_total',
+  'nexusinfra_gateway_requests_total',
   'nexusinfra_http_request_duration_seconds_bucket',
   'nexusinfra_dead_letters',
   'nexusinfra_outbox_pending',
@@ -137,11 +139,14 @@ export class PrometheusScraper {
     if (names.has('nexusinfra_agent_containers'))
       this.store.addSample('containers', target, now, sum(samples, 'nexusinfra_agent_containers', (l) => l.state === 'running'));
 
-    if (!names.has('nexusinfra_http_requests_total')) return;
+    // Every service counts with httpMetrics(); the gateway has its own counter instead
+    // (services/gateway/src/gateway.ts). Never both, so take whichever is there.
+    const counter = ['nexusinfra_http_requests_total', 'nexusinfra_gateway_requests_total'].find((n) => names.has(n));
+    if (!counter) return;
     const current: Previous = {
       ts: now,
-      requests: sum(samples, 'nexusinfra_http_requests_total'),
-      errors: sum(samples, 'nexusinfra_http_requests_total', (l) => l.status === '5xx'),
+      requests: sum(samples, counter),
+      errors: sum(samples, counter, (l) => l.status === '5xx'),
       buckets: buckets(samples),
     };
     const prev = this.previous.get(target);
