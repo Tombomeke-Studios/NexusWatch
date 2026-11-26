@@ -9,10 +9,11 @@ _(no active branch)_
 ## Backlog
 
 ### Backend (collector follow-ups)
-- [ ] Feed SLOs and `/status` from live sources (#—)
+- [ ] SLOs per service are availability only, at one `NW_SLO_TARGET`; per-service targets and latency SLOs (#—)
 - [ ] Business: account standing, credits and revenue per plan need a `billing.credit.*` event from NexusInfra's Billing Bridge (its HTTP API takes the internal token, which can also change credit) (#—)
 - [ ] FinVault page: invoices, FX, wallet types, security counters and RabbitMQ queue depths have no read-only source (management API, FinVault events) (#—)
-- [ ] NexusInfra page: container list per node (node agent API needs the internal token); nodes without memory in their heartbeat read 0 / 0 GB (#—)
+- [ ] NexusInfra page: containers on other nodes than the collector's host (only the local Docker socket is read); nodes without memory in their heartbeat read 0 / 0 GB (#—)
+- [ ] Overview top-up / payment tiles read 0 without a bus — make them nullable (#—)
 - [ ] `npm run dev` crashes when the root `.env` is missing (`node --watch` with `--env-file-if-exists`) (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
 - [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
@@ -28,7 +29,6 @@ _(no active branch)_
 - [ ] Charts: align a live series that is shorter than the window to the right of the time axis (#—)
 - [ ] Heartbeats card says "every 30 s" — show the configured interval from the API (#—)
 - [ ] Host card shows sample "nodes connected" when no node source is configured — say "no node source" instead (#—)
-- [ ] Build and run the Docker images end to end (compose validated, images not built yet: Docker daemon was off) (#—)
 - [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
 - [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
 
@@ -73,6 +73,11 @@ _(no active branch)_
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `feature/release` — merged into `dev`
+- [x] Docker Engine source: top consumers, NexusInfra containers, memory / disk IO / network, host name (#—)
+- [x] Live SLOs, incidents and `/status`; no sample data anywhere once a source is set (#—)
+- [x] Collector image carries all of `dashboard/src` (the file list had gone stale); image built and run against a real Docker socket (#—)
+- [x] Release workflow: `v*` tag → images on GHCR + GitHub release (#—)
 ### `feature/business-events` — merged into `dev`
 - [x] Record business events from the bus (`bank.payment.#`, `events.#`, `billing.#`, `infra.#`), once per event id, ids and amounts only (#—)
 - [x] Real top-ups and payments on Overview, NexusInfra and FinVault; Business from the bus (top-ups, suspensions, throughput, dead letters, outboxes) (#—)
