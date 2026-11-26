@@ -195,13 +195,14 @@ describe.each(modes)('HTTP contract — %s', (_mode, make) => {
     for (const id of ['cpu', 'memory', 'disk', 'network', 'queues']) {
       const m = await api.get<C.MetricData>(`/api/metrics/${id}?range=24h`);
       expect(m.id).toBe(id);
-      // Live: a metric nobody measured (the fake agent reports no disk) has no series, not zeros.
-      if (live && id === 'disk') expect(m.series).toEqual([]);
+      // Live: a metric nobody measured (the fake agent reports no disk; no Docker socket for network)
+      // has no series — not zeros and not sample data.
+      if (live && (id === 'disk' || id === 'network')) expect(m.series).toEqual([]);
       else expect(m.series.length).toBeGreaterThan(0);
       for (const s of m.series) {
         expect(s.values.length).toBeGreaterThan(0);
         expect(s.values.length).toBeLessThanOrEqual(90);
-        if (!live || id === 'network') expect(s.values).toHaveLength(90);
+        if (!live) expect(s.values).toHaveLength(90);
       }
     }
     expect(await api.status('/api/metrics/nope')).toBe(404);
@@ -291,6 +292,19 @@ describe('HTTP contract — live specifics', () => {
     expect(fv.services[0].service.status).toBe('slow');
     expect(fv.services[1].p95).toBe('timeout');
     expect(fv.services.every((s) => s.rps === null && s.errorPct === null)).toBe(true);
+  });
+
+  it('serves no sample data anywhere once a source is configured', async () => {
+    // Names that only exist in the dashboard's sample data.
+    const SAMPLE_ONLY = ['game-valheim-02', 'web-mc-04', 'node-02', 'home.example', 'acc_29e', 'tu_8', 'w_3f9a', 'inc_4', 'mnt-finvault-db'];
+    for (const path of [
+      '/api/host', '/api/nav', '/api/overview?range=24h', '/api/metrics?range=24h', '/api/metrics/network?range=24h', '/api/heartbeats',
+      '/api/projects/nexusinfra', '/api/projects/finvault', '/api/business', '/api/slos', '/api/incidents', '/api/status', '/api/settings',
+      '/api/alerts', '/api/logs?range=24h',
+    ]) {
+      const text = JSON.stringify(await api.get<unknown>(path));
+      for (const name of SAMPLE_ONLY) expect(text, `${path} contains ${name}`).not.toContain(name);
+    }
   });
 
   it('builds top-ups and payments from the bus, masked, with the unobserved ledger null', async () => {

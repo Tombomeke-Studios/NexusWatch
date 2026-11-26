@@ -1,6 +1,7 @@
 /** The Metrics page and the Overview charts — from stored samples where a source feeds them. */
 import type { ChartColor, MetricData, MetricId, MetricsOverview, Series, TimeRange } from '../contract.js';
 import { RANGE_MS } from '../duration.js';
+import { topContainers } from './containers.js';
 import type { Ctx } from './ctx.js';
 import { round, seriesByName, summedSeries } from './series.js';
 
@@ -13,7 +14,7 @@ const STORED: Partial<Record<MetricId, { metric: string; query: string; live: (c
   memory: { metric: 'memory', query: 'heartbeat.node resources.ramUsedMb / ramTotalMb', live: (c) => c.live.nodeMetrics },
   disk: { metric: 'disk', query: 'heartbeat.node resources.diskUsedGb / diskTotalGb', live: (c) => c.live.nodeMetrics },
   queues: { metric: 'queues', query: 'nexusinfra_dead_letters, nexusinfra_outbox_pending', live: (c) => c.live.queues },
-  // network: no source measures it yet → sample data.
+  network: { metric: 'network', query: 'docker stats: sum of container rx/tx bytes, Mbit/s', live: (c) => c.live.docker },
 };
 
 export function colored(series: { name: string; values: number[] }[]): Series[] {
@@ -35,7 +36,8 @@ export function summed(ctx: Ctx, metric: string, range: TimeRange, points: numbe
 export function metric(ctx: Ctx, id: MetricId, range: TimeRange): MetricData {
   const base = ctx.sample.metric(id);
   const stored = STORED[id];
-  if (!stored || !stored.live(ctx)) return base;
+  // Nothing measures this chart: sample data without any source, no series at all with one.
+  if (!stored || !stored.live(ctx)) return ctx.live.logs ? { ...base, query: 'no source configured', series: [] } : base;
   const series = colored(storedSeries(ctx, stored.metric, range, POINTS));
   const top = Math.max(0, ...series.flatMap((s) => s.values));
   // Percent charts keep 100; counts get a y axis that fits them.
@@ -60,8 +62,20 @@ export function metricsOverview(ctx: Ctx, range: TimeRange): MetricsOverview {
       const trend = averaged(ctx, 'cpu', range);
       return trend.length ? { ...s, value: String(round(last(trend))), delta: delta(trend, '%'), trend } : { ...s, value: '–', delta: 'no data yet', trend: [] };
     }
-    if (s.title === 'Containers running' && ctx.live.requests) {
-      const trend = summed(ctx, 'containers', range, 40);
+    if (s.title === 'Memory' && ctx.live.docker) {
+      const trend = summed(ctx, 'docker_memory', range, 40).map((b) => round(b / 1024 ** 3, 1));
+      return trend.length ? { ...s, value: String(last(trend)), delta: delta(trend, 'GB'), trend } : { ...s, value: '–', delta: 'no data yet', trend: [] };
+    }
+    if (s.title === 'Disk IO' && ctx.live.docker) {
+      const trend = summed(ctx, 'disk_io', range, 40);
+      return trend.length ? { ...s, value: String(round(last(trend), 1)), delta: delta(trend, 'MB/s'), trend } : { ...s, value: '–', delta: 'no data yet', trend: [] };
+    }
+    if (s.title === 'Network in' && ctx.live.docker) {
+      const trend = storedSeries(ctx, 'network', range, 40).find((x) => x.name === 'inbound')?.values ?? [];
+      return trend.length ? { ...s, value: String(round(last(trend), 1)), delta: delta(trend, 'Mbit/s'), trend } : { ...s, value: '–', delta: 'no data yet', trend: [] };
+    }
+    if (s.title === 'Containers running' && (ctx.live.docker || ctx.live.requests)) {
+      const trend = summed(ctx, ctx.live.docker ? 'docker_containers' : 'containers', range, 40);
       return trend.length ? { ...s, value: String(round(last(trend))), delta: delta(trend, ''), trend } : { ...s, value: '–', delta: 'no data yet', trend: [] };
     }
     if (s.title === 'Queue depth' && ctx.live.queues) {
@@ -71,9 +85,9 @@ export function metricsOverview(ctx: Ctx, range: TimeRange): MetricsOverview {
         ? { ...s, value: '–', delta: 'no data yet', trend: [] }
         : { ...s, value: String(round(now)), delta: delta(trend, 'msg'), tone: now > 0 ? ('down' as const) : ('ok' as const), trend };
     }
-    return s;
+    return ctx.live.logs ? { ...s, value: '–', delta: 'no source', tone: 'mute' as const, trend: [] } : s;
   });
-  return { summaries, topContainers: base.topContainers };
+  return { summaries, topContainers: ctx.live.logs ? topContainers(ctx) : base.topContainers };
 }
 
 /** Mean over series per point (e.g. CPU across nodes). */

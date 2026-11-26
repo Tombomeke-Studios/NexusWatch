@@ -72,7 +72,7 @@ export function summaryFor(ctx: Ctx, t: HealthTarget): ServiceSummary {
 }
 
 export function services(ctx: Ctx): ServiceSummary[] {
-  if (!ctx.live.services) return ctx.sample.services;
+  if (!ctx.live.logs) return ctx.sample.services;
   return ctx.config.health.targets.map((t) => summaryFor(ctx, t));
 }
 
@@ -81,7 +81,7 @@ export function serviceById(ctx: Ctx, id: string): ServiceSummary | undefined {
 }
 
 export function monitors(ctx: Ctx): Monitor[] {
-  if (!ctx.live.services) return ctx.sample.heartbeats().monitors;
+  if (!ctx.live.logs) return ctx.sample.heartbeats().monitors;
   const now = ctx.clock();
   return ctx.config.health.targets.map((t) => {
     const s = summaryFor(ctx, t);
@@ -104,7 +104,7 @@ export function monitors(ctx: Ctx): Monitor[] {
 }
 
 export function serviceDetail(ctx: Ctx, id: string): ServiceDetail | null {
-  if (!ctx.live.services) return ctx.sample.serviceDetail(id);
+  if (!ctx.live.logs) return ctx.sample.serviceDetail(id);
   const t = ctx.config.health.targets.find((x) => x.id === id);
   if (!t) return null;
   const now = ctx.clock();

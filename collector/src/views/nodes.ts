@@ -27,7 +27,7 @@ export function gauges(r: Resources | undefined): Gauge[] {
 }
 
 export function nodes(ctx: Ctx): NodeSummary[] {
-  if (!ctx.live.nodes) return ctx.sample.nodes;
+  if (!ctx.live.logs) return ctx.sample.nodes;
   const now = ctx.clock();
   return liveSources(ctx.store, 'node', now).map((s) => ({
     id: s.name,

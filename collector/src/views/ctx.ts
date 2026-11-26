@@ -20,9 +20,14 @@ export interface Live {
   requests: boolean;
   /** Prometheus or Control Room → queue depths (dead letters, outbox). */
   queues: boolean;
+  /** Docker socket → containers, top consumers, network. */
+  docker: boolean;
   /** Bus → top-ups, payments, transfers, billing (views/business.ts). */
   business: boolean;
-  /** Any of the above writes logs and opens incidents. */
+  /**
+   * Any source at all. Then the whole API is "real": a part without a source answers empty or
+   * unknown, never sample data. Logs, alerts and incidents come from the store.
+   */
   logs: boolean;
 }
 
@@ -49,14 +54,15 @@ export function liveFor(config: Config): Live {
     requests,
     queues: requests || Boolean(config.controlRoom),
     business: Boolean(config.bus),
-    logs: services || nodes,
+    docker: Boolean(config.docker),
+    logs: services || nodes || requests || Boolean(config.bus) || Boolean(config.docker),
   };
 }
 
 export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[]; fetch?: Fetch; mail?: Mailer | null } = {}): Ctx {
   const clock = opts.clock ?? Date.now;
   // Alerting and incident writes from an earlier run (views/persist.ts).
-  restoreState(store);
+  restoreState(store, Object.values(liveFor(config)).some(Boolean));
   return {
     store, config, clock, sample, live: liveFor(config), tasks: opts.tasks ?? (() => []), startedAt: clock(),
     notify: { fetch: opts.fetch ?? fetch, mail: opts.mail ?? null, timeoutMs: config.notify.timeoutMs },

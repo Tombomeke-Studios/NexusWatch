@@ -67,7 +67,7 @@ function Agents({ data }: { data: SettingsData }) {
                 {a.name}
                 <span className="mono subtle" style={{ fontWeight: 400, fontSize: 12, display: 'block' }}>{a.host}</span>
               </span>
-              <span className="mono muted" data-label="Token" style={{ flex: '2 1 200px', fontSize: 12.5 }}>nw_agent_••••••••{a.tokenHint}</span>
+              <span className="mono muted" data-label="Token" style={{ flex: '2 1 200px', fontSize: 12.5 }}>{a.tokenHint ? `nw_agent_••••••••${a.tokenHint}` : '— NexusInfra node agent'}</span>
               <span className="mono muted" data-label="Version" style={{ flex: '1 1 80px' }}>{a.version}</span>
               <span className="mono muted" data-label="Last seen" style={{ flex: '1 1 110px' }}>{a.lastSeenSeconds} s ago</span>
               <span style={{ flex: '1 1 90px' }}><Pill tone={statusPill[a.status]}>{statusLabel[a.status]}</Pill></span>

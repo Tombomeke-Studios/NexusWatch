@@ -147,7 +147,7 @@ export function alerts(ctx: Ctx): AlertsData {
     // Silences, maintenance windows and escalation policies are the stored set the dashboard edits.
     ...base,
     // The services a maintenance window can be scoped to are the monitored ones.
-    services: ctx.live.services ? ctx.config.health.targets.map(({ id, name, project }) => ({ id, name, project })) : base.services,
+    services: ctx.live.logs ? ctx.config.health.targets.map(({ id, name, project }) => ({ id, name, project })) : base.services,
     summary: {
       critical: active.filter((a) => a.severity === 'critical').length,
       warning: active.filter((a) => a.severity === 'warning').length,
