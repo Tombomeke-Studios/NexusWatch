@@ -10,6 +10,7 @@
  * - `queues` / `dead-letters`      nexusinfra_dead_letters (only present when the broker answered)
  * - `queues` / `outbox <target>`   nexusinfra_outbox_pending
  * - `containers` / `<target>`      nexusinfra_agent_containers{state="running"}
+ * - `containers_total` / `<target>` nexusinfra_agent_containers, every state
  * Rates need two scrapes, so the first scrape of a target only stores the gauges.
  */
 import type { MetricsTarget } from '../config.js';
@@ -136,8 +137,10 @@ export class PrometheusScraper {
     const names = new Set(samples.map((s) => s.name));
     if (names.has('nexusinfra_dead_letters')) this.store.addSample('queues', 'dead-letters', now, sum(samples, 'nexusinfra_dead_letters'));
     if (names.has('nexusinfra_outbox_pending')) this.store.addSample('queues', `outbox ${target}`, now, sum(samples, 'nexusinfra_outbox_pending'));
-    if (names.has('nexusinfra_agent_containers'))
+    if (names.has('nexusinfra_agent_containers')) {
       this.store.addSample('containers', target, now, sum(samples, 'nexusinfra_agent_containers', (l) => l.state === 'running'));
+      this.store.addSample('containers_total', target, now, sum(samples, 'nexusinfra_agent_containers'));
+    }
 
     // Every service counts with httpMetrics(); the gateway has its own counter instead
     // (services/gateway/src/gateway.ts). Never both, so take whichever is there.

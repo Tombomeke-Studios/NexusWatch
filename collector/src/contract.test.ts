@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadConfig } from './config.js';
 import type * as C from './contract.js';
 import { createApp } from './server.js';
+import { BusinessRecorder } from './sources/business.js';
 import { HeartbeatConsumer } from './sources/bus.js';
 import { runHealthCheck } from './sources/health.js';
 import { PrometheusScraper, parsePrometheus } from './sources/prometheus.js';
@@ -61,7 +62,9 @@ async function liveCtx(): Promise<Ctx> {
     now += id === 'fv-api-gateway' ? 140 : 30;
     return new Response('{"status":"healthy"}');
   };
-  const bus = new HeartbeatConsumer(store, clock, undefined);
+  const bus = new HeartbeatConsumer(store, clock, undefined, new BusinessRecorder(store));
+  const event = (key: string, type: string, payload: object) =>
+    bus.handle(key, Buffer.from(JSON.stringify({ eventId: `${type}-${now}`, timestamp: new Date(now).toISOString(), source: 'test', event: { type, payload } })));
   const scraper = new PrometheusScraper(store, fetchFor('x'), clock);
   for (let i = 0; i < 10; i++) {
     for (const t of config.health.targets) await runHealthCheck(t, store, fetchFor(t.id), clock, { slowMs: 100, failuresForIncident: 3 });
@@ -70,6 +73,8 @@ async function liveCtx(): Promise<Ctx> {
     scraper.ingest('orchestrator', parsePrometheus(`nexusinfra_http_requests_total{status="2xx"} ${i * 100}\nnexusinfra_http_requests_total{status="5xx"} ${i}\nnexusinfra_dead_letters 2`), now);
     now += 60_000;
   }
+  event('bank.payment.request', 'payment.request', { reference: 'topup-u1-a', senderWalletId: 'u1', amount: 25, customerEmail: 'tom@example.com', description: 'free text' });
+  event('events.payment.confirmed', 'payment.confirmed', { reference: 'topup-u1-a', amount: 25 });
   now = Date.now();
   // The node's last heartbeat was a minute ago, so by now it counts as offline.
   return createCtx(store, config, { clock: () => Date.now() });
@@ -286,6 +291,19 @@ describe('HTTP contract — live specifics', () => {
     expect(fv.services[0].service.status).toBe('slow');
     expect(fv.services[1].p95).toBe('timeout');
     expect(fv.services.every((s) => s.rps === null && s.errorPct === null)).toBe(true);
+  });
+
+  it('builds top-ups and payments from the bus, masked, with the unobserved ledger null', async () => {
+    const b = await api.get<C.BusinessData>('/api/business');
+    expect(b.topUps).toHaveLength(1);
+    expect(b.topUps[0]).toMatchObject({ reference: 'topup-u1-a', payer: 't***@e***.com', status: null, credits: null, finvault: { outcome: 'confirmed', amountEur: 25 } });
+    for (const t of b.topUps) expect(t.status === null).toBe(t.credits === null);
+    expect(JSON.stringify(b)).not.toContain('free text');
+    expect(JSON.stringify(b)).not.toContain('tom@example.com');
+    const o = await api.get<C.OverviewData>('/api/overview?range=24h');
+    expect(o.kpis).toMatchObject({ topupsToday: expect.any(Number), paymentsMonthEur: expect.any(Number) });
+    const fv = await api.get<C.FinVaultData>('/api/projects/finvault');
+    expect(fv.security).toBeNull();
   });
 
   it('draws request rates and dead letters from the scrape', async () => {

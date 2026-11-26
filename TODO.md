@@ -9,7 +9,11 @@ _(no active branch)_
 ## Backlog
 
 ### Backend (collector follow-ups)
-- [ ] Feed SLOs, `/status` and Business from live sources (#—)
+- [ ] Feed SLOs and `/status` from live sources (#—)
+- [ ] Business: account standing, credits and revenue per plan need a `billing.credit.*` event from NexusInfra's Billing Bridge (its HTTP API takes the internal token, which can also change credit) (#—)
+- [ ] FinVault page: invoices, FX, wallet types, security counters and RabbitMQ queue depths have no read-only source (management API, FinVault events) (#—)
+- [ ] NexusInfra page: container list per node (node agent API needs the internal token); nodes without memory in their heartbeat read 0 / 0 GB (#—)
+- [ ] `npm run dev` crashes when the root `.env` is missing (`node --watch` with `--env-file-if-exists`) (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
 - [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
 - [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
@@ -17,7 +21,7 @@ _(no active branch)_
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
 - [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
 - [ ] Rule evaluation: let heartbeat rules own "service down" instead of the health checker's fixed failure count (#—)
-- [ ] Consume FinVault gateway events (`bank.payment.*`, `events.<type>`): top-ups, payments, transactions, FinVault rps/error % (#—)
+- [ ] FinVault rps / error % per service (no `/metrics` in FinVault) (#—)
 - [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
 - [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
 - [ ] Alerts for heartbeat sources link to `/services/<source>`, which 404s for nodes — link nodes to Heartbeats instead (#—)
@@ -69,6 +73,11 @@ _(no active branch)_
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `feature/business-events` — merged into `dev`
+- [x] Record business events from the bus (`bank.payment.#`, `events.#`, `billing.#`, `infra.#`), once per event id, ids and amounts only (#—)
+- [x] Real top-ups and payments on Overview, NexusInfra and FinVault; Business from the bus (top-ups, suspensions, throughput, dead letters, outboxes) (#—)
+- [x] Unobserved ledger is `null` in the contract (`TopUpRecord.status`/`credits`, FinVault invoices/FX/security); reconcile skips credit rules then (#—)
+- [x] Container counts (running / all) from the node agent scrape (#—)
 ### `claude/eloquent-einstein-u98csl` (gateway scrape) — merged into `dev`
 - [x] Read the NexusInfra gateway's own `nexusinfra_gateway_requests_total` (no histogram, so no p95) (#—)
 ### `feature/rule-evaluation` — merged into `dev`

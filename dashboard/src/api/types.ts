@@ -414,14 +414,16 @@ export interface Transaction {
 }
 
 export interface FinVaultData {
-  kpis: { topupsToday: number; topupsTodayEur: number; topupsDelta: string; activeWallets: number; transfers: number; transferSuccessPct: number; openInvoices: number; openInvoicesNote: string; fxConversions: number; fxNote: string };
+  /** null = no source measures it (shown as unknown, never 0). */
+  kpis: { topupsToday: number; topupsTodayEur: number; topupsDelta: string; activeWallets: number; transfers: number; transferSuccessPct: number | null; openInvoices: number | null; openInvoicesNote: string; fxConversions: number | null; fxNote: string };
   funnel: { label: string; count: number; color: ChartColor }[];
   topupsPerHour: number[];
   walletSplit: { label: string; pct: number; color: ChartColor }[];
   services: FinVaultService[];
   queues: { name: string; ready: number; threshold: number; capacity: number }[];
   transactions: Transaction[];
-  security: { failedLogins: number; tokenReuse: number; rateLimitHits: number };
+  /** null = no source (FinVault does not publish these). */
+  security: { failedLogins: number; tokenReuse: number; rateLimitHits: number } | null;
 }
 
 // ── Settings ───────────────────────────────────────────────────────────
@@ -661,13 +663,18 @@ export interface TopUpRecord {
   requestedAt: string;
   /** Whether the broker took `payment.request`. Not sent = failed at once, never pending. */
   sent: boolean;
-  status: TopUpLedgerStatus;
+  /** The bridge's own status; null = not observed (the collector sees the bus, not the bridge's ledger). */
+  status: TopUpLedgerStatus | null;
   /** When the bridge turned it *Not confirmed* (`TOPUP_TIMEOUT_MS`); null if it never did. */
   expiredAt: string | null;
   /** FinVault's answer as seen on the bus (`events.payment.*` / `bank.payment.*`); null = none yet. */
   finvault: { outcome: 'confirmed' | 'failed'; at: string; amountEur: number; reason: string | null } | null;
-  /** Credit-ledger entries carrying this reference, oldest first. Exactly one is the healthy case. */
-  credits: { at: string; amountEur: number }[];
+  /**
+   * Credit-ledger entries carrying this reference, oldest first. Exactly one is the healthy case.
+   * null = not observed: the Billing Bridge publishes no credit event, so a backend that only reads
+   * the bus cannot know. Never sent as [] in that case — an empty list claims "not credited".
+   */
+  credits: { at: string; amountEur: number }[] | null;
 }
 
 /** An account's standing at the Billing Bridge (#365, #379). Ids only. */

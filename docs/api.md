@@ -108,7 +108,22 @@ served: a part with a configured source is answered from stored data ("live"), e
 the dashboard's own sample generators, so the API is complete from the first start. `GET /health`
 lists which parts are live.
 
-Business, SLOs, incidents, `/status` and the alerting writes (rules, silences, maintenance windows,
+**Business data from the bus.** With `NW_RABBITMQ_URL` set, the collector also binds `bank.payment.#`,
+`events.#`, `billing.#` and `infra.#` on `finvault.events` and stores each event once (by event id), with
+only ids, amounts and times kept — free text is dropped and emails are masked before storing. From those
+it answers `/business`, the Overview's top-up and payment tiles, the payments on `/projects/nexusinfra`
+and the business part of `/projects/finvault`. Days and hours are UTC. A top-up is NexusInfra's
+`payment.request` with a `topup-…` reference; a payment is a top-up FinVault confirmed, counted on the
+day it was confirmed; a transfer is any other `payment.confirmed` / `payment.failed`. What the bus does
+not carry is reported as unknown, never as sample data: `TopUpRecord.status` and `credits` are `null`
+(the bridge publishes no credit event), `accounts` and `revenueByPlan` are empty (they live in the
+bridge's database), `FinVaultData.kpis.openInvoices` / `fxConversions` / `transferSuccessPct` (no
+transfer yet) and `security` are `null`, `walletSplit`, `queues`, `bus.queues` and
+`NexusInfraData.containers` are empty (wallet types, the broker's management API and the node agent's
+container list are not reachable read-only). `topUpTimeoutMs` / `lowCreditHours` come from
+`NW_TOPUP_TIMEOUT_MS` / `NW_LOW_CREDIT_HOURS` (NexusInfra's defaults: 30 min, 24 h).
+
+SLOs, incidents, `/status` and the alerting writes (rules, silences, maintenance windows,
 escalation policies, resolving an alert) have no live source yet: the collector answers them from the
 sample generators. What the writes change — rules, silences, maintenance windows, escalation policies,
 acknowledgements with their notes, resolutions, declared incidents and their updates — is stored after
@@ -147,7 +162,7 @@ Rules the live answers follow, beyond the shapes:
   `responseTimes` ≤ 96, `days` ≤ 60, metric series ≤ 90). A metric nobody measures has no series at
   all. An empty bucket after the first measurement repeats the previous value.
 - **Unknown is `null`** where the contract allows it: a failed check's latency, `FinVaultService.rps`
-  and `errorPct` while no request-rate source covers FinVault.
+  and `errorPct` while no request-rate source covers FinVault, and the business fields above.
 - A few fields are not nullable yet and read `0` while unmeasured: `Monitor.avgLatencyMs`,
   `ServiceDetail.kpis.avgLatencyMs` / `p95LatencyMs` (no answered check in 24h), `restarts24h` and
   `NodeSummary.containers` (need the agent). TODO.md tracks making them nullable.
@@ -205,6 +220,9 @@ the rules are tested once and the backend cannot quietly disagree with them.
   (`sent`), the bridge's ledger status and when it turned *Not confirmed*, FinVault's answer as seen on
   the bus (`events.payment.*` or `bank.payment.*`, matched on the reference) and every credit-ledger
   entry carrying the reference. `credits` is a list on purpose: two entries is the anomaly to catch.
+  `status` and `credits` are `null` together when the backend cannot see the bridge's ledger (a
+  bus-only collector): `[]` would claim "not credited". The dashboard then shows the wallet step as
+  *not observed* and a FinVault-confirmed top-up as `confirmed` instead of `credited`.
 - `payer` is the payer's email **masked by the backend** (`t***@e***.com`) or null. A full address must
   never be returned; the dashboard masks again on display as a safety net. Everything else is ids.
 - `accounts` — each account's standing: balance, available (balance less usage not yet charged),

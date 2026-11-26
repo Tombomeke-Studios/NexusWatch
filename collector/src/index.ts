@@ -4,6 +4,7 @@ import { loadConfig } from './config.js';
 import { notifyTask } from './notify/dispatch.js';
 import { createMailer } from './notify/mailer.js';
 import { HeartbeatConsumer, startBus } from './sources/bus.js';
+import { BusinessRecorder } from './sources/business.js';
 import { controlRoomTask } from './sources/controlRoom.js';
 import { healthTasks } from './sources/health.js';
 import { DEGRADED_MS, evaluateBusSources } from './sources/heartbeat.js';
@@ -52,7 +53,7 @@ scheduler.start();
 let stopBus: (() => Promise<void>) | null = null;
 if (config.bus) {
   const { url, queue } = config.bus;
-  const consumer = new HeartbeatConsumer(store, clock);
+  const consumer = new HeartbeatConsumer(store, clock, process.env.FINVAULT_MESSAGE_KEY, new BusinessRecorder(store));
   void startBus(url, queue, consumer, (error) => {
     scheduler.report('bus', 0, error);
     if (error) console.warn(`[collector] event bus: ${error}`);

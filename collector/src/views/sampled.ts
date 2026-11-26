@@ -6,6 +6,7 @@
  * restart. TODO.md tracks moving each one to a real source.
  */
 import { reliability, sample } from '../sample.js';
+import { businessData } from './business.js';
 import { HttpError, type RouteHandler } from '../routes.js';
 import type { Ctx } from './ctx.js';
 import { saveState } from './persist.js';
@@ -45,7 +46,7 @@ const knownServices = (ctx: Ctx) => (ctx.live.services ? ctx.config.health.targe
 const note = (body: unknown) => ((body as { note?: unknown } | null)?.note as string | undefined) ?? '';
 
 export const sampledRoutes: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: string; handle: RouteHandler }[] = [
-  { method: 'GET', path: '/business', handle: () => sample.business() },
+  { method: 'GET', path: '/business', handle: (ctx) => (ctx.live.business ? businessData(ctx) : sample.business()) },
 
   { method: 'GET', path: '/slos', handle: () => reliability.slos() },
   { method: 'GET', path: '/incidents', handle: () => reliability.incidents() },

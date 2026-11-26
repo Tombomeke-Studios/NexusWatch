@@ -47,13 +47,13 @@ function Body({ data }: { data: FinVaultData }) {
       <section className="kpis" aria-label="Key figures">
         <Kpi accent="fv" label="Top-ups today" labelColor="var(--fv)" swatch="var(--c-fv)" value={k.topupsToday} unit={formatEur(k.topupsTodayEur, true)} foot={k.topupsDelta} />
         <Kpi label="Active wallets" value={k.activeWallets} foot="last 24 hours" />
-        <Kpi label="Transfers" value={k.transfers} foot={`${formatPercent(k.transferSuccessPct, 1)} succeeded · P2P + SEPA`} />
-        <Kpi label="Open invoices" value={k.openInvoices} valueColor="var(--warn)" foot={k.openInvoicesNote} />
-        <Kpi label="FX conversions" value={k.fxConversions} foot={k.fxNote} />
+        <Kpi label="Transfers" value={k.transfers} foot={`${k.transferSuccessPct === null ? 'success unknown' : `${formatPercent(k.transferSuccessPct, 1)} succeeded`} · P2P + SEPA`} />
+        <Kpi label="Open invoices" value={k.openInvoices ?? 'unknown'} valueColor={k.openInvoices ? 'var(--warn)' : undefined} foot={k.openInvoicesNote} />
+        <Kpi label="FX conversions" value={k.fxConversions ?? 'unknown'} foot={k.fxNote} />
       </section>
 
       <Card padded labelledBy="fn">
-        <CardHeader flat id="fn" title="Top-up funnel" hint="from request to credits at NexusInfra · today" link={{ to: routes.business, label: 'Reconcile top-ups' }} />
+        <CardHeader flat id="fn" title="Top-up funnel" hint="NexusInfra credit top-ups paid in FinVault · today" link={{ to: routes.business, label: 'Reconcile top-ups' }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {data.funnel.map((f, i) => {
             const prev = i ? data.funnel[i - 1].count : f.count;
@@ -82,7 +82,8 @@ function Body({ data }: { data: FinVaultData }) {
         </Card>
         <Card padded labelledBy="wt" style={{ flex: '1 1 320px', minWidth: 0 }}>
           <CardHeader flat id="wt" title="Balance by wallet type" />
-          <StackBar parts={data.walletSplit.map((w) => ({ pct: w.pct, color: chartColor(w.color) }))} label={`Split: ${data.walletSplit.map((w) => `${w.label} ${w.pct}%`).join(', ')}`} />
+          {data.walletSplit.length === 0 && <p className="muted" style={{ margin: 0 }}>Not measured — FinVault's balance events carry no wallet type.</p>}
+          {data.walletSplit.length > 0 && <StackBar parts={data.walletSplit.map((w) => ({ pct: w.pct, color: chartColor(w.color) }))} label={`Split: ${data.walletSplit.map((w) => `${w.label} ${w.pct}%`).join(', ')}`} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
             {data.walletSplit.map((w) => (
               <div key={w.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -128,6 +129,7 @@ function Body({ data }: { data: FinVaultData }) {
         <Card padded labelledBy="qq" style={{ flex: '2 1 360px', minWidth: 0 }}>
           <CardHeader flat id="qq" title="RabbitMQ queues" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {data.queues.length === 0 && <p className="muted" style={{ margin: 0 }}>Not measured — needs the broker's management API.</p>}
             {data.queues.map((q) => {
               const over = q.ready > q.threshold;
               return (
@@ -169,11 +171,15 @@ function Body({ data }: { data: FinVaultData }) {
 
         <Card padded labelledBy="sec" style={{ flex: '1 1 280px', minWidth: 0 }}>
           <CardHeader flat id="sec" title="Security" hint="24h" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="baseline"><span className="num" style={{ fontSize: 28 }}>{data.security.failedLogins}</span><span className="muted">failed logins</span></div>
-            <div className="baseline"><span className="num" style={{ fontSize: 28, color: data.security.tokenReuse ? 'var(--warn)' : undefined }}>{data.security.tokenReuse}</span><span className="muted">refresh-token reuse</span></div>
-            <div className="baseline"><span className="num" style={{ fontSize: 28 }}>{data.security.rateLimitHits}</span><span className="muted">rate-limit hits (Redis)</span></div>
-          </div>
+          {data.security === null ? (
+            <p className="muted" style={{ margin: 0 }}>Not measured — FinVault publishes no security events.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="baseline"><span className="num" style={{ fontSize: 28 }}>{data.security.failedLogins}</span><span className="muted">failed logins</span></div>
+              <div className="baseline"><span className="num" style={{ fontSize: 28, color: data.security.tokenReuse ? 'var(--warn)' : undefined }}>{data.security.tokenReuse}</span><span className="muted">refresh-token reuse</span></div>
+              <div className="baseline"><span className="num" style={{ fontSize: 28 }}>{data.security.rateLimitHits}</span><span className="muted">rate-limit hits (Redis)</span></div>
+            </div>
+          )}
         </Card>
       </div>
     </>

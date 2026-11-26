@@ -6,7 +6,9 @@
  * - metrics     — numeric samples per metric and series (`cpu` / `node-01`, `requests` / `rps`, …)
  * - heartbeats  — every health check (status + latency, null when there was no answer),
  *                 the incidents they open, and the last-known state of heartbeat sources
- * Plus a small key/value table for what the dashboard writes: settings, acknowledgements, rule toggles.
+ * Plus a small key/value table for what the dashboard writes: settings, acknowledgements, rule toggles,
+ * and the business events heard on the bus (top-ups, payments, billing): the money record, small and
+ * never pruned, deduplicated by event id because the broker delivers at least once.
  * The schema is created here on start; there is no separate migration step yet.
  */
 import { mkdirSync, statSync } from 'node:fs';
@@ -45,6 +47,16 @@ export interface SourceState {
   origin: string;
   /** Extra facts, e.g. a node's resources from its heartbeat. */
   detail: Record<string, unknown>;
+}
+
+/** A business event as heard on the bus; `data` is the payload with personal data already masked. */
+export interface BusEvent {
+  id: string;
+  ts: number;
+  routingKey: string;
+  type: string;
+  source: string;
+  data: Record<string, unknown>;
 }
 
 export interface IncidentRow {
@@ -100,6 +112,10 @@ const SCHEMA = `
     note TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER
   );
   CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY, ts INTEGER NOT NULL, routing_key TEXT NOT NULL, type TEXT NOT NULL, source TEXT NOT NULL, data TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS events_type ON events (type, ts);
 `;
 
 /** Tables per retention kind — what `prune` deletes from and `usage` measures. */
@@ -333,6 +349,30 @@ export class Store {
       startedAt: r.started_at as number,
       endedAt: (r.ended_at as number | null) ?? null,
     };
+  }
+
+  // ── Business events ──────────────────────────────────────────────────
+  /** Stores an event once; a redelivery with the same id is ignored. Returns whether it was new. */
+  addEvent(e: BusEvent): boolean {
+    const r = this.db
+      .prepare('INSERT OR IGNORE INTO events (id, ts, routing_key, type, source, data) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(e.id, e.ts, e.routingKey, e.type, e.source, JSON.stringify(e.data));
+    return Number(r.changes) > 0;
+  }
+
+  /** When the first business event was stored; null when none was. */
+  firstEventAt(): number | null {
+    const r = this.db.prepare('SELECT min(ts) ts FROM events').get() as Row | undefined;
+    return (r?.ts as number | null | undefined) ?? null;
+  }
+
+  /** Events of the given types from `from` (inclusive), oldest first. */
+  events(types: string[], from = 0, to = Number.MAX_SAFE_INTEGER): BusEvent[] {
+    if (types.length === 0) return [];
+    const rows = this.db
+      .prepare(`SELECT * FROM events WHERE type IN (${types.map(() => '?').join(',')}) AND ts >= ? AND ts <= ? ORDER BY ts, id`)
+      .all(...types, from, to) as Row[];
+    return rows.map((r) => ({ id: r.id as string, ts: r.ts as number, routingKey: r.routing_key as string, type: r.type as string, source: r.source as string, data: JSON.parse(r.data as string) }));
   }
 
   // ── Key/value ────────────────────────────────────────────────────────
