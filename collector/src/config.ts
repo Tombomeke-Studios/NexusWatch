@@ -30,11 +30,16 @@ export interface MetricsTarget {
 export interface Config {
   port: number;
   dbPath: string;
-  host: { name: string; address: string | null };
+  /** `explicit` = NW_HOST_NAME was set; otherwise the Docker host's name is preferred when known. */
+  host: { name: string; address: string | null; explicit: boolean };
   health: { targets: HealthTarget[]; slowMs: number; failuresForIncident: number };
   controlRoom: { url: string; intervalMs: number; nodePattern: RegExp } | null;
   metrics: { targets: MetricsTarget[]; intervalMs: number; token: string | undefined };
   bus: { url: string; queue: string } | null;
+  /** The Docker Engine socket of this machine (read-only use): containers, CPU, memory, network. */
+  docker: { socket: string; intervalMs: number } | null;
+  /** Availability objective for each monitored service's SLO, in percent. */
+  sloTargetPct: number;
   /** NexusInfra's billing settings, so the dashboard judges top-ups by the bridge's own clock. */
   business: { topUpTimeoutMs: number; lowCreditHours: number };
   pruneIntervalMs: number;
@@ -161,7 +166,7 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
   return {
     port: num(env, 'NW_PORT', 8080),
     dbPath: env.NW_DB_PATH || 'data/nexuswatch.db',
-    host: { name: env.NW_HOST_NAME || hostname(), address: env.NW_HOST_ADDRESS || null },
+    host: { name: env.NW_HOST_NAME || hostname(), address: env.NW_HOST_ADDRESS || null, explicit: Boolean(env.NW_HOST_NAME) },
     health: {
       targets,
       slowMs: num(env, 'NW_HEALTH_SLOW_MS', 100),
@@ -179,7 +184,9 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
       intervalMs: num(env, 'NW_METRICS_INTERVAL_MS', 15_000),
       token: env.NW_METRICS_TOKEN || undefined,
     },
+    docker: env.NW_DOCKER_SOCKET ? { socket: env.NW_DOCKER_SOCKET, intervalMs: Math.max(5_000, num(env, 'NW_DOCKER_INTERVAL_MS', 15_000)) } : null,
     bus: env.NW_RABBITMQ_URL ? { url: env.NW_RABBITMQ_URL, queue: env.NW_RABBITMQ_QUEUE || 'nexuswatch.collector' } : null,
+    sloTargetPct: Math.min(99.999, num(env, 'NW_SLO_TARGET', 99.5)),
     // Defaults are the Billing Bridge's (TOPUP_TIMEOUT_MS, LOW_CREDIT_HOURS); set them to match NexusInfra's.
     business: { topUpTimeoutMs: num(env, 'NW_TOPUP_TIMEOUT_MS', 30 * 60_000), lowCreditHours: num(env, 'NW_LOW_CREDIT_HOURS', 24) },
     pruneIntervalMs: num(env, 'NW_PRUNE_INTERVAL_MS', 3_600_000),

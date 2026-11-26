@@ -4,6 +4,7 @@ import type { FinVaultData, HeartbeatsData, HostInfo, NavCounts, NexusInfraData,
 import { RANGE_MS } from '../duration.js';
 import { activeAlerts, incidents } from './alerts.js';
 import { finVaultBusiness, nexusInfraPayments, overviewMoney } from './business.js';
+import { hostName, nexusInfraContainers } from './containers.js';
 import type { Ctx } from './ctx.js';
 import { recentEvents } from './logs.js';
 import { colored, storedSeries, summed } from './metrics.js';
@@ -22,7 +23,7 @@ function firstAddress(): string {
 export function host(ctx: Ctx): HostInfo {
   const list = nodes(ctx);
   return {
-    name: ctx.config.host.name,
+    name: hostName(ctx),
     address: ctx.config.host.address ?? firstAddress(),
     uptimeSeconds: Math.round(uptime()),
     nodesConnected: list.filter((n) => n.status !== 'down').length,
@@ -49,9 +50,11 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
   const list = services(ctx);
   const now = ctx.clock();
 
-  let p95Ms = base.kpis.p95Ms;
-  let p95Trend = base.kpis.p95Trend;
-  let requests = base.requests;
+  // With any source, nothing below is sample data: unmeasured parts are 0 / empty.
+  const real = ctx.live.logs;
+  let p95Ms = real ? 0 : base.kpis.p95Ms;
+  let p95Trend = real ? [] : base.kpis.p95Trend;
+  let requests = real ? { rps: [], errors5xx: [] } : base.requests;
   if (ctx.live.requests) {
     p95Trend = summarisedP95(ctx, range);
     p95Ms = p95Trend.length ? Math.round(p95Trend[p95Trend.length - 1]) : 0;
@@ -64,7 +67,7 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
   }
 
   const active = activeAlerts(ctx);
-  const money = ctx.live.business ? overviewMoney(ctx) : null;
+  const money = real ? overviewMoney(ctx) : null;
   return {
     kpis: {
       ...base.kpis,
@@ -76,11 +79,11 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
       p95Ms,
       p95Trend,
       openAlerts: active.length,
-      openAlertsSummary: ctx.live.logs ? alertSummary(ctx) : base.kpis.openAlertsSummary,
+      openAlertsSummary: real ? alertSummary(ctx) : base.kpis.openAlertsSummary,
     },
     services: list,
     events: recentEvents(ctx),
-    cpuByNode: ctx.live.nodeMetrics ? colored(storedSeries(ctx, 'cpu', range, 60)) : base.cpuByNode,
+    cpuByNode: real ? colored(storedSeries(ctx, 'cpu', range, 60)) : base.cpuByNode,
     requests,
     topupsPerHour: money ? money.topupsPerHour : base.topupsPerHour,
     paymentsPerDay: money ? money.paymentsPerDay : base.paymentsPerDay,
@@ -116,14 +119,20 @@ export function heartbeats(ctx: Ctx): HeartbeatsData {
 
 export function nexusInfra(ctx: Ctx): NexusInfraData {
   const sampled = ctx.sample.nexusInfra();
-  const pay = ctx.live.business ? nexusInfraPayments(ctx) : null;
-  const base: NexusInfraData = pay
-    ? { ...sampled, kpis: { ...sampled.kpis, paymentsMonthEur: pay.paymentsMonthEur }, paymentsPerDay: pay.paymentsPerDay, payments: pay.payments }
-    : sampled;
-  const live = ctx.live.business || ctx.live.nodes || ctx.live.requests;
+  if (!ctx.live.logs) return sampled;
+  // Live: every figure from a source; one without a source reads 0 / empty, never the sample's.
+  const pay = nexusInfraPayments(ctx);
+  const base: NexusInfraData = {
+    kpis: { ...sampled.kpis, nodesOnline: 0, nodesTotal: 0, nodeNote: 'no node source', cpuPct: 0, memoryUsedGb: 0, memoryTotalGb: 0, paymentsMonthEur: pay.paymentsMonthEur },
+    nodes: [],
+    containers: [],
+    components: [],
+    paymentsPerDay: pay.paymentsPerDay,
+    payments: pay.payments,
+  };
   const nodeList = nodes(ctx);
-  const components = ctx.live.services ? services(ctx).filter((s) => s.project === 'nexusinfra') : base.components;
-  if (!ctx.live.nodes) return live ? { ...base, components, kpis: { ...base.kpis, ...containersLive(ctx) }, containers: [] } : { ...base, components };
+  const components = services(ctx).filter((s) => s.project === 'nexusinfra');
+  if (!ctx.live.nodes) return { ...base, components, kpis: { ...base.kpis, ...containersLive(ctx) }, containers: nexusInfraContainers(ctx) };
   const online = nodeList.filter((n) => n.status !== 'down');
   const notOk = nodeList.filter((n) => n.status !== 'up');
   const cpu = nodeList.flatMap((n) => n.gauges.filter((g) => g.label === 'CPU').map((g) => g.pct));
@@ -140,7 +149,7 @@ export function nexusInfra(ctx: Ctx): NexusInfraData {
     },
     nodes: nodeList,
     components,
-    containers: [],
+    containers: nexusInfraContainers(ctx),
   };
 }
 
@@ -163,6 +172,17 @@ function memoryLive(ctx: Ctx): { memoryUsedGb: number; memoryTotalGb: number } {
  * the agent's own API, which takes NexusInfra's internal token, so the list stays empty.
  */
 function containersLive(ctx: Ctx): Pick<NexusInfraData['kpis'], 'containersRunning' | 'containersTotal' | 'containersNote'> {
+  if (ctx.live.docker) {
+    // The Docker host sees every NexusInfra container: its stacks and the customer servers.
+    const list = nexusInfraContainers(ctx);
+    const running = list.filter((c) => c.state === 'running').length;
+    const down = list.filter((c) => c.state !== 'running').map((c) => c.name);
+    return {
+      containersRunning: running,
+      containersTotal: list.length,
+      containersNote: list.length === 0 ? 'no container seen yet' : down.length ? `${down.length} not running (${down.slice(0, 2).join(', ')}${down.length > 2 ? ', …' : ''})` : 'all running',
+    };
+  }
   const running = ctx.store.latestSamples('containers').reduce((a, s) => a + s.value, 0);
   const all = ctx.store.latestSamples('containers_total').reduce((a, s) => a + s.value, 0);
   const total = Math.max(all, running);
@@ -175,8 +195,8 @@ function containersLive(ctx: Ctx): Pick<NexusInfraData['kpis'], 'containersRunni
 
 export function finVault(ctx: Ctx): FinVaultData {
   const sampled = ctx.sample.finVault();
-  const base: FinVaultData = ctx.live.business ? { ...sampled, ...finVaultBusiness(ctx) } : sampled;
-  if (!ctx.live.services) return base;
+  if (!ctx.live.logs) return sampled;
+  const base: FinVaultData = { ...sampled, ...finVaultBusiness(ctx), services: [] };
   const now = ctx.clock();
   const targets = ctx.config.health.targets.filter((t) => t.project === 'finvault');
   return {

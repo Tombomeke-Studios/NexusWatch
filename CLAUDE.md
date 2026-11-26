@@ -160,6 +160,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `dashboard/index.html` | Viewport (`viewport-fit=cover`), `theme-color`, manifest + apple-touch-icon links, and a pre-paint script that applies the stored theme |
 | `dashboard/public/` | `favicon.svg`, PWA `manifest.webmanifest`, icons (`icon*.svg` sources → `icon-192/512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`), `sw.js` (app-shell service worker, never caches `/api`) |
 | `dashboard/scripts/render-icons.sh` | Regenerates the PNG icons from the SVG sources with headless Chrome |
+| `.github/workflows/release.yml` | On a `v*` tag: build/lint/test, push `ghcr.io/<owner>/nexuswatch/{collector,dashboard}:<version>` + `latest`, create the GitHub release |
 | `.claude/launch.json` | Browser-preview entries: `dashboard` (sample data), `dashboard+collector` |
 | `.env.example` | Every collector variable (sources, notification targets, timings, retention prune) |
 | `docker-compose.yml` · `.dockerignore` | Collector (SQLite volume) + dashboard (nginx proxying `/api`) |
@@ -225,6 +226,9 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `sources/controlRoom.ts` | NexusInfra Control Room `/status` + `/uptime` poller |
 | `sources/prometheus.ts` | Text-format parser (kept series only) + scraper with counter rates and histogram p95 |
 | `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
+| `sources/docker.ts` | Docker Engine over its socket (GET only): containers with project (labels), CPU, memory, uptime, restarts; network / disk IO / memory totals; the host's name |
+| `views/containers.ts` | Top consumers (CPU, last 5 min), the NexusInfra container list, `hostName` |
+| `views/reliability.ts` | Live SLOs (one per health target, `NW_SLO_TARGET`), incidents (declared + the collector's own), `/status` from the monitored services |
 | `sources/business.ts` | `BusinessRecorder`: binds `bank.payment.#`, `events.#`, `billing.#`, `infra.#`; stores each event once with kept fields only (`keptFields`), counts bus throughput per minute |
 | `views/business.ts` | Top-ups, payments, transfers, suspensions and bus health from stored events: `/business`, the Overview money tiles, NexusInfra payments, the FinVault business part |
 | `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
@@ -289,6 +293,14 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   `queries.ts`; never call `fetch` from a page.
 - **Node 25 ships its own `localStorage` global** that shadows jsdom's and has no working methods —
   `test/setup.ts` installs an in-memory one. Don't remove it.
+- **Any source configured = no sample data anywhere.** `live.logs` is true as soon as one source is set; every
+  view then answers from the store, and a part without a source is empty/unknown. Sample data is only for a
+  collector with no source at all (development). `contract.test.ts` checks the live API for sample-only names.
+  In live mode the seeded silences, maintenance windows, incidents and example runbook links are dropped at
+  start (`restoreState`); rules and escalation policies stay as editable defaults.
+- **The Docker socket is read with GET only** (`sources/docker.ts`). The Engine API has no read-only mode, so
+  never add a POST/DELETE there; the socket is mounted `:ro` and the collector joins its group via `group_add`.
+- **The collector image carries all of `dashboard/src`** — it imports more of it over time; a hand-kept file list broke.
 - **Not observed is `null`, never `[]` or `0`.** A bus-only collector cannot see the Billing Bridge's ledger:
   `TopUpRecord.status` and `credits` are `null` together, and `reconcile` then skips every credit rule.
   Business fields without a source are `null`/empty in live mode — never filled from sample data.

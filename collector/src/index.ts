@@ -12,6 +12,7 @@ import { PrometheusScraper, metricsTasks } from './sources/prometheus.js';
 import { Scheduler } from './sources/scheduler.js';
 import type { Task } from './sources/types.js';
 import { createApp } from './server.js';
+import { DockerSource, socketApi } from './sources/docker.js';
 import { Store } from './store.js';
 import { createCtx } from './views/ctx.js';
 import { prune } from './views/settings.js';
@@ -20,10 +21,16 @@ const config = loadConfig();
 const store = new Store(config.dbPath);
 const clock = Date.now;
 
+function dockerTask(docker: NonNullable<typeof config.docker>): Task {
+  const source = new DockerSource(store, socketApi(docker.socket), clock);
+  return { name: 'docker', intervalMs: docker.intervalMs, run: async () => void (await source.poll()) };
+}
+
 const tasks: Task[] = [
   ...healthTasks(config.health.targets, store, fetch, clock, { slowMs: config.health.slowMs, failuresForIncident: config.health.failuresForIncident }),
   ...(config.controlRoom ? [controlRoomTask(config.controlRoom, store, fetch, clock)] : []),
   ...metricsTasks(config.metrics.targets, new PrometheusScraper(store, fetch, clock, config.metrics.token), config.metrics.intervalMs),
+  ...(config.docker ? [dockerTask(config.docker)] : []),
   ...(config.bus ? [{ name: 'bus:evaluate', intervalMs: DEGRADED_MS, run: async () => evaluateBusSources(store, clock()) }] : []),
 ];
 const email = config.notify.targets.email;

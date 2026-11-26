@@ -108,6 +108,15 @@ served: a part with a configured source is answered from stored data ("live"), e
 the dashboard's own sample generators, so the API is complete from the first start. `GET /health`
 lists which parts are live.
 
+**No sample data once a source is set.** With any source configured, every endpoint answers from what
+the collector measured; a part without a source answers empty or unknown (`series: []`, `–` summaries,
+empty lists, 0 counts). SLOs are one availability objective per health target (`NW_SLO_TARGET`, 30 days;
+a check that answered is good). `/incidents` lists declared incidents and the collector's own (health
+checks, heartbeat sources, rules; never public). `/status` has one component per health target, by name
+only. With `NW_DOCKER_SOCKET`, top consumers, the NexusInfra container list and the memory, disk IO and
+network figures come from the host's Docker Engine; the host card names the Docker host unless
+`NW_HOST_NAME` is set.
+
 **Business data from the bus.** With `NW_RABBITMQ_URL` set, the collector also binds `bank.payment.#`,
 `events.#`, `billing.#` and `infra.#` on `finvault.events` and stores each event once (by event id), with
 only ids, amounts and times kept — free text is dropped and emails are masked before storing. From those

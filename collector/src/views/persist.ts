@@ -10,6 +10,14 @@
 import { reliability, sample } from '../sample.js';
 import type { Store } from '../store.js';
 
+/** The sample modules' seeded examples, read before anything is restored. */
+const SEEDED = {
+  silences: new Set(sample.alertingState().silences.map((s) => s.id)),
+  maintenance: new Set(sample.alertingState().maintenance.map((m) => m.id)),
+  incidents: new Set(reliability.incidentState().incidents.map((i) => i.id)),
+};
+const SAMPLE_RUNBOOKS = 'https://wiki.home.example/';
+
 const ALERTING = 'state.alerting';
 const INCIDENTS = 'state.incidents';
 
@@ -30,8 +38,13 @@ const isIncidentState = (v: unknown): v is IncidentState => {
   return !!s && typeof s.updateSeq === 'number' && Array.isArray(s.incidents);
 };
 
-/** Loads the stored snapshots into the sample modules. A snapshot that does not parse is skipped, loudly. */
-export function restoreState(store: Store): void {
+/**
+ * Loads the stored snapshots into the sample modules. A snapshot that does not parse is skipped, loudly.
+ * `live`: the collector measures something, so the seeded examples (a silence, two maintenance windows,
+ * a set of incidents, runbook links to an example wiki) are removed — rules and escalation policies stay
+ * as editable defaults. Idempotent, so it also cleans a snapshot saved before this existed.
+ */
+export function restoreState(store: Store, live = false): void {
   const alerting = store.get<unknown>(ALERTING);
   if (isAlertingState(alerting)) sample.restoreAlertingState(alerting);
   else if (alerting !== undefined) console.warn('[collector] stored alerting state is unreadable — starting from the defaults');
@@ -39,6 +52,18 @@ export function restoreState(store: Store): void {
   const incidents = store.get<unknown>(INCIDENTS);
   if (isIncidentState(incidents)) reliability.restoreIncidentState(incidents);
   else if (incidents !== undefined) console.warn('[collector] stored incident state is unreadable — starting from the defaults');
+
+  if (live) {
+    const a = sample.alertingState();
+    sample.restoreAlertingState({
+      ...a,
+      silences: a.silences.filter((s) => !SEEDED.silences.has(s.id)),
+      maintenance: a.maintenance.filter((m) => !SEEDED.maintenance.has(m.id)),
+      rules: a.rules.map((r) => (r.runbookUrl.startsWith(SAMPLE_RUNBOOKS) ? { ...r, runbookUrl: '' } : r)),
+    });
+    const i = reliability.incidentState();
+    reliability.restoreIncidentState({ ...i, incidents: i.incidents.filter((x) => !SEEDED.incidents.has(x.id)) });
+  }
 }
 
 /** Stores the current snapshots. Call after a write succeeded. */

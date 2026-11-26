@@ -30,6 +30,20 @@ export function settings(ctx: Ctx): SettingsData {
   const retention = (stored.retention ?? base.retention).map((r) => ({ ...r, usedBytes: usage.perKind[r.id] ?? 0 }));
   return {
     ...base,
+    // Live: the agents are NexusInfra's node agents heard on the bus or reported by the Control Room
+    // (NexusWatch's own agent is not built, so there is no token to show).
+    agents: ctx.live.logs
+      ? ctx.store.sources('node').map((n) => ({
+          id: n.name,
+          name: n.name,
+          host: typeof n.detail.host === 'string' ? n.detail.host : n.origin,
+          tokenHint: '',
+          version: typeof n.detail.version === 'string' ? n.detail.version : '—',
+          lastSeenSeconds: Math.max(0, Math.round((ctx.clock() - n.lastSeen) / 1000)),
+          status: n.status,
+        }))
+      : base.agents,
+    serverUrl: ctx.config.notify.publicUrl ?? (ctx.live.logs ? 'set NW_PUBLIC_URL' : base.serverUrl),
     // Where a channel sends to is the collector's configuration, shown masked; only its switch is stored.
     channels: base.channels.map((c) => {
       const target = maskTarget(c.id, ctx.config.notify.targets);

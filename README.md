@@ -23,6 +23,11 @@ to `.env` and set the `NW_*` variables to watch a real NexusInfra / FinVault sta
 
 With Docker: `docker compose up --build`, then http://localhost:8088.
 
+**Releases.** Pushing a `v*` tag (`git tag v0.2.0 && git push origin v0.2.0`) runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml): build, lint and test, then the images
+`ghcr.io/tombomeke-studios/nexuswatch/collector:<version>` and `…/dashboard:<version>` (plus `:latest`),
+then a GitHub release with generated notes.
+
 ## Scripts (repo root)
 
 | Command | What it does |
@@ -47,12 +52,17 @@ real stack:
 | `NW_CONTROL_ROOM_URL` | `http://localhost:9000` | NexusInfra Control Room `/status` + `/uptime` (nodes, heartbeat sources) |
 | `NW_METRICS_TARGETS` | `orchestrator=http://localhost:9200/metrics,…` | Prometheus scrape (requests, 5xx, p95, queues) |
 | `NW_METRICS_TOKEN` | NexusInfra's `METRICS_TOKEN` | Bearer token for protected `/metrics` |
-| `NW_RABBITMQ_URL` | `amqp://guest:guest@localhost:5672` | Heartbeats on `finvault.events` (node CPU / memory / disk) |
+| `NW_RABBITMQ_URL` | `amqp://guest:guest@localhost:5672` | Heartbeats on `finvault.events` (node CPU / memory / disk), top-ups, payments, billing events |
+| `NW_DOCKER_SOCKET` | `/var/run/docker.sock` | Every container on this host: top consumers, NexusInfra containers, memory, disk IO, network |
+| `NW_HOST_NAME` / `NW_HOST_ADDRESS` | `home-server`, `192.168.0.117` | The host card (in Docker the collector only sees its own container) |
 | `FINVAULT_MESSAGE_KEY` | the key both platforms share | Reading encrypted payloads |
 | `NW_DISCORD_WEBHOOK_URL` | `https://discord.com/api/webhooks/…` | Notifications to Discord |
 | `NW_TELEGRAM_BOT_TOKEN` + `NW_TELEGRAM_CHAT_ID` | `123456:ABC-DEF`, `-100…` | Notifications to Telegram |
 | `NW_NTFY_URL` (+ `NW_NTFY_TOKEN`) | `https://ntfy.sh/my-topic` | Push notifications through ntfy |
 | `NW_SMTP_URL` + `NW_EMAIL_FROM` + `NW_EMAIL_TO` | `smtp://user:pass@host:587` | Notifications by email |
+
+**Once any source is set, nothing is sample data:** a part without a source answers empty or unknown.
+Without any source, every endpoint serves the built-in sample data (for development).
 
 Also `NW_PORT` (8080), `NW_DB_PATH`, intervals, timeouts and thresholds, all listed in `.env.example`.
 `GET http://localhost:8080/health` shows which parts are live and each source's last error.

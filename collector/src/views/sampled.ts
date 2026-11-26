@@ -7,6 +7,7 @@
  */
 import { reliability, sample } from '../sample.js';
 import { businessData } from './business.js';
+import { incidentLive, incidentsLive, slosLive, statusLive } from './reliability.js';
 import { HttpError, type RouteHandler } from '../routes.js';
 import type { Ctx } from './ctx.js';
 import { saveState } from './persist.js';
@@ -41,20 +42,20 @@ function checkedRule(body: unknown): Pick<AlertRuleInput, 'project' | 'condition
 }
 
 /** A maintenance window may be scoped to a monitored service; without health targets, to a sample one. */
-const knownServices = (ctx: Ctx) => (ctx.live.services ? ctx.config.health.targets : sample.services);
+const knownServices = (ctx: Ctx) => (ctx.live.logs ? ctx.config.health.targets : sample.services);
 
 const note = (body: unknown) => ((body as { note?: unknown } | null)?.note as string | undefined) ?? '';
 
 export const sampledRoutes: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: string; handle: RouteHandler }[] = [
-  { method: 'GET', path: '/business', handle: (ctx) => (ctx.live.business ? businessData(ctx) : sample.business()) },
+  { method: 'GET', path: '/business', handle: (ctx) => (ctx.live.logs ? businessData(ctx) : sample.business()) },
 
-  { method: 'GET', path: '/slos', handle: () => reliability.slos() },
-  { method: 'GET', path: '/incidents', handle: () => reliability.incidents() },
+  { method: 'GET', path: '/slos', handle: (ctx) => (ctx.live.logs ? slosLive(ctx) : reliability.slos()) },
+  { method: 'GET', path: '/incidents', handle: (ctx) => (ctx.live.logs ? incidentsLive(ctx) : reliability.incidents()) },
   {
     method: 'GET',
     path: '/incidents/:id',
-    handle: (_ctx, { params }) => {
-      const detail = reliability.incident(params.id);
+    handle: (ctx, { params }) => {
+      const detail = ctx.live.logs ? incidentLive(ctx, params.id) : reliability.incident(params.id);
       if (!detail) throw new HttpError(404, `Incident ${params.id} not found`);
       return detail;
     },
@@ -62,7 +63,7 @@ export const sampledRoutes: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: s
   { method: 'POST', path: '/incidents', handle: withBody(reliability.createIncident) },
   { method: 'POST', path: '/incidents/:id/updates', handle: byId(reliability.postIncidentUpdate) },
   { method: 'POST', path: '/incidents/:id/resolve', handle: byId(reliability.resolveIncident) },
-  { method: 'GET', path: '/status', handle: () => reliability.statusPage() },
+  { method: 'GET', path: '/status', handle: (ctx) => (ctx.live.logs ? statusLive(ctx) : reliability.statusPage()) },
 
   { method: 'POST', path: '/alerts/:id/resolve', handle: (ctx, { params, body }) => run(ctx, () => sample.resolveAlert(params.id, note(body))) },
   // `/alert-rules/test` before `/alert-rules/:id` — same method family, and "test" is not an id.

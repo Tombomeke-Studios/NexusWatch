@@ -1,0 +1,100 @@
+name: Release
+
+# Publishes the collector and dashboard images for a tagged release, then the GitHub release.
+#   git tag v0.2.0 && git push origin v0.2.0
+# Images: ghcr.io/<owner>/nexuswatch/{collector,dashboard}:<version> and :latest.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.2.1). Defaults to the tag.'
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # A release is only worth publishing if it would have passed CI.
+  validate:
+    name: Build, lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # node:sqlite needs Node >= 22.13 (the images use Node 22 too).
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+
+  images:
+    name: image · ${{ matrix.image }}
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [collector, dashboard]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the version and image namespace
+        id: meta
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # GHCR rejects a mixed-case repository name, and the owner is not necessarily lowercase.
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # Both Dockerfiles build from the repo root (the collector imports the dashboard's contract).
+          context: .
+          file: ${{ matrix.image }}/Dockerfile
+          push: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/nexuswatch/${{ matrix.image }}:${{ steps.meta.outputs.version }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/nexuswatch/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  release:
+    name: GitHub release
+    needs: images
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" --generate-notes --title "NexusWatch $VERSION" --notes "Images:
+          - ghcr.io/$OWNER/nexuswatch/collector:$VERSION
+          - ghcr.io/$OWNER/nexuswatch/dashboard:$VERSION"
