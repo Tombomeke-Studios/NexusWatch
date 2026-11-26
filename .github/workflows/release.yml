@@ -1,7 +1,8 @@
 name: Release
 
-# Publishes the collector and dashboard images for a tagged release, then the GitHub release.
-#   git tag v0.2.0 && git push origin v0.2.0
+# Publishes the collector and dashboard images for a release, then the GitHub release.
+#   git tag v0.2.0 && git push origin v0.2.0       — or —
+#   Actions → Release → Run workflow on main, version 0.2.0 (creates the tag v0.2.0 on that commit)
 # Images: ghcr.io/<owner>/nexuswatch/{collector,dashboard}:<version> and :latest.
 
 on:
@@ -83,7 +84,7 @@ jobs:
   release:
     name: GitHub release
     needs: images
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -94,7 +95,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OWNER="${GITHUB_REPOSITORY_OWNER,,}"
-          VERSION="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" --generate-notes --title "NexusWatch $VERSION" --notes "Images:
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          # A tag push already has its tag; a manual run creates v<version> on the commit it ran on.
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --generate-notes --title "NexusWatch $VERSION" --notes "Images:
           - ghcr.io/$OWNER/nexuswatch/collector:$VERSION
           - ghcr.io/$OWNER/nexuswatch/dashboard:$VERSION"
