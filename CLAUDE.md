@@ -31,12 +31,14 @@ replace each `(#—)` with its `(#N)` → from then on, sections 2a and 2b apply
 workspace serving every path of [docs/api.md](docs/api.md) (health checks, Control Room, Prometheus
 scrape, event-bus heartbeats → SQLite; sample data for anything without a source), and notification
 delivery for real incidents (Discord, Telegram, ntfy, email), and rule evaluation on live latency and node metrics.
-**What does not:** the agent, escalation steps, rule metrics without a source (queue depth, 5xx rate, top-ups), FinVault business data.
+Business data (top-ups, payments, transfers, suspensions) comes from the bus too.
+**What does not:** the agent, escalation steps, rule metrics without a source (queue depth, 5xx rate, top-ups), what only the Billing Bridge's database or FinVault's services know (credits, standing, plans, invoices, FX, security).
 
 **Relation to the other projects.** NexusWatch is a *read-only observer*. It never changes NexusInfra
 or FinVault state and never shares their databases. Built data sources (collector): NexusInfra's
 Control Room `/status` + `/uptime`, every service's `/health` and Prometheus `/metrics`, the
-`monitoring.heartbeat.#` routing keys on the `finvault.events` exchange. Not yet: FinVault's gateway events.
+`monitoring.heartbeat.#` routing keys and the business events (`bank.payment.#`, `events.#`, `billing.#`,
+`infra.#`) on the `finvault.events` exchange.
 Consuming that exchange means following NexusInfra's wire rules (`readPayload()`, never rename the
 exchange, never change the encryption constants).
 
@@ -217,12 +219,14 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `contract.ts` · `sample.ts` | Re-export the dashboard's `api/types.ts` and `api/mock/data.ts` (never copied) |
 | `routes.ts` | **Every endpoint, one table** (`/health` + docs/api.md); add an endpoint here |
 | `server.ts` | Express app: routes under `/api`, `/health` at the root, `HttpError` → status + text |
-| `store.ts` | SQLite (`node:sqlite`): logs, checks, samples, heartbeat sources, incidents, key/value; `prune`, `usage` |
+| `store.ts` | SQLite (`node:sqlite`): logs, checks, samples, heartbeat sources, incidents, key/value, business events (never pruned); `prune`, `usage` |
 | `duration.ts` | `parseDuration('14d')`, time ranges |
 | `sources/health.ts` | Heartbeat checker: `checkOnce`, `runHealthCheck` (logs + incidents) |
 | `sources/controlRoom.ts` | NexusInfra Control Room `/status` + `/uptime` poller |
 | `sources/prometheus.ts` | Text-format parser (kept series only) + scraper with counter rates and histogram p95 |
 | `sources/bus.ts` · `sources/payload.ts` | `monitoring.heartbeat.#` consumer; `readPayload()` mirror of NexusInfra's |
+| `sources/business.ts` | `BusinessRecorder`: binds `bank.payment.#`, `events.#`, `billing.#`, `infra.#`; stores each event once with kept fields only (`keptFields`), counts bus throughput per minute |
+| `views/business.ts` | Top-ups, payments, transfers, suspensions and bus health from stored events: `/business`, the Overview money tiles, NexusInfra payments, the FinVault business part |
 | `sources/heartbeat.ts` | Source status by age (Control Room thresholds), transitions → logs/incidents |
 | `alerting/readings.ts` | `liveReadings`: stored checks and node samples as `Reading`s at a fixed step (unknown = `null`); `bucketsBack` |
 | `alerting/evaluate.ts` | `evaluateRules` / `rulesTask`: opens and closes `rule:<ruleId>:<target>` incidents; `testRuleLive`, `currentReading`, `parseSubject` |
@@ -230,7 +234,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
 | `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
-| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business, SLOs, incidents, `/status` and the alerting writes — sample generators), `persist` (snapshots the sample modules' alerting and incident state into SQLite after each write; `createCtx` restores it) |
+| `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business without a bus, SLOs, incidents, `/status` and the alerting writes — sample generators), `persist` (snapshots the sample modules' alerting and incident state into SQLite after each write; `createCtx` restores it) |
 | `contract.test.ts` | The mock invariants over HTTP, sample mode and live mode |
 | `../Dockerfile` · `../targets.example.json` | Collector image (repo-root context); example health-target list |
 
@@ -285,6 +289,11 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   `queries.ts`; never call `fetch` from a page.
 - **Node 25 ships its own `localStorage` global** that shadows jsdom's and has no working methods —
   `test/setup.ts` installs an in-memory one. Don't remove it.
+- **Not observed is `null`, never `[]` or `0`.** A bus-only collector cannot see the Billing Bridge's ledger:
+  `TopUpRecord.status` and `credits` are `null` together, and `reconcile` then skips every credit rule.
+  Business fields without a source are `null`/empty in live mode — never filled from sample data.
+- **Business events keep a whitelist of fields** (`keptFields` in `sources/business.ts`). Adding a field means
+  checking it is not free text or personal data; emails are masked before storing.
 - **The backend reports top-up facts; the dashboard reconciles them** (`lib/reconcile.ts`). Never add a
   verdict field (`anomaly`, `ok`) to `TopUpRecord` — the rules would then live in two places. Judge with
   the response's `topUpTimeoutMs` and the query's `dataUpdatedAt`, not a constant or a fresh `Date.now()`.

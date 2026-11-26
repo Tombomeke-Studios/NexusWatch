@@ -3,6 +3,7 @@ import { networkInterfaces, uptime } from 'node:os';
 import type { FinVaultData, HeartbeatsData, HostInfo, NavCounts, NexusInfraData, OverviewData, TimeRange } from '../contract.js';
 import { RANGE_MS } from '../duration.js';
 import { activeAlerts, incidents } from './alerts.js';
+import { finVaultBusiness, nexusInfraPayments, overviewMoney } from './business.js';
 import type { Ctx } from './ctx.js';
 import { recentEvents } from './logs.js';
 import { colored, storedSeries, summed } from './metrics.js';
@@ -63,9 +64,11 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
   }
 
   const active = activeAlerts(ctx);
+  const money = ctx.live.business ? overviewMoney(ctx) : null;
   return {
     kpis: {
       ...base.kpis,
+      ...(money ? { topupsToday: money.topupsToday, topupsTrend: money.topupsTrend, paymentsMonthEur: money.paymentsMonthEur, paymentsTrend: money.paymentsTrend } : {}),
       servicesUp: list.filter((s) => s.status === 'up').length,
       servicesTotal: list.length,
       servicesSlow: list.filter((s) => s.status === 'slow').length,
@@ -79,8 +82,8 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
     events: recentEvents(ctx),
     cpuByNode: ctx.live.nodeMetrics ? colored(storedSeries(ctx, 'cpu', range, 60)) : base.cpuByNode,
     requests,
-    topupsPerHour: base.topupsPerHour,
-    paymentsPerDay: base.paymentsPerDay,
+    topupsPerHour: money ? money.topupsPerHour : base.topupsPerHour,
+    paymentsPerDay: money ? money.paymentsPerDay : base.paymentsPerDay,
   };
 }
 
@@ -112,10 +115,15 @@ export function heartbeats(ctx: Ctx): HeartbeatsData {
 }
 
 export function nexusInfra(ctx: Ctx): NexusInfraData {
-  const base = ctx.sample.nexusInfra();
+  const sampled = ctx.sample.nexusInfra();
+  const pay = ctx.live.business ? nexusInfraPayments(ctx) : null;
+  const base: NexusInfraData = pay
+    ? { ...sampled, kpis: { ...sampled.kpis, paymentsMonthEur: pay.paymentsMonthEur }, paymentsPerDay: pay.paymentsPerDay, payments: pay.payments }
+    : sampled;
+  const live = ctx.live.business || ctx.live.nodes || ctx.live.requests;
   const nodeList = nodes(ctx);
   const components = ctx.live.services ? services(ctx).filter((s) => s.project === 'nexusinfra') : base.components;
-  if (!ctx.live.nodes) return { ...base, components };
+  if (!ctx.live.nodes) return live ? { ...base, components, kpis: { ...base.kpis, ...containersLive(ctx) }, containers: [] } : { ...base, components };
   const online = nodeList.filter((n) => n.status !== 'down');
   const notOk = nodeList.filter((n) => n.status !== 'up');
   const cpu = nodeList.flatMap((n) => n.gauges.filter((g) => g.label === 'CPU').map((g) => g.pct));
@@ -126,15 +134,48 @@ export function nexusInfra(ctx: Ctx): NexusInfraData {
       nodesOnline: online.length,
       nodesTotal: nodeList.length,
       nodeNote: notOk.length ? notOk.map((n) => `${n.name} ${n.status === 'down' ? 'offline' : 'slow'}`).join(', ') : 'all nodes healthy',
-      cpuPct: cpu.length ? Math.round(cpu.reduce((a, b) => a + b, 0) / cpu.length) : base.kpis.cpuPct,
+      cpuPct: cpu.length ? Math.round(cpu.reduce((a, b) => a + b, 0) / cpu.length) : 0,
+      ...memoryLive(ctx),
+      ...containersLive(ctx),
     },
     nodes: nodeList,
     components,
+    containers: [],
+  };
+}
+
+/** Memory over every node that reports it in its heartbeat (GB); 0 / 0 when none does. */
+function memoryLive(ctx: Ctx): { memoryUsedGb: number; memoryTotalGb: number } {
+  let used = 0;
+  let total = 0;
+  for (const n of ctx.store.sources('node')) {
+    const r = n.detail.resources as { ramUsedMb?: number; ramTotalMb?: number } | undefined;
+    if (typeof r?.ramUsedMb === 'number' && typeof r.ramTotalMb === 'number') {
+      used += r.ramUsedMb;
+      total += r.ramTotalMb;
+    }
+  }
+  return { memoryUsedGb: Math.round(used / 1024), memoryTotalGb: Math.round(total / 1024) };
+}
+
+/**
+ * Container counts from the node agents' scrape (running / all states). The per-container rows need
+ * the agent's own API, which takes NexusInfra's internal token, so the list stays empty.
+ */
+function containersLive(ctx: Ctx): Pick<NexusInfraData['kpis'], 'containersRunning' | 'containersTotal' | 'containersNote'> {
+  const running = ctx.store.latestSamples('containers').reduce((a, s) => a + s.value, 0);
+  const all = ctx.store.latestSamples('containers_total').reduce((a, s) => a + s.value, 0);
+  const total = Math.max(all, running);
+  return {
+    containersRunning: running,
+    containersTotal: total,
+    containersNote: !ctx.store.hasSamples('containers') ? 'no node agent scraped' : total > running ? `${total - running} not running` : 'all running',
   };
 }
 
 export function finVault(ctx: Ctx): FinVaultData {
-  const base = ctx.sample.finVault();
+  const sampled = ctx.sample.finVault();
+  const base: FinVaultData = ctx.live.business ? { ...sampled, ...finVaultBusiness(ctx) } : sampled;
   if (!ctx.live.services) return base;
   const now = ctx.clock();
   const targets = ctx.config.health.targets.filter((t) => t.project === 'finvault');

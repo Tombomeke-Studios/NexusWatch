@@ -35,6 +35,7 @@ with an injected `fetch` and clock so it is tested without a network:
 | Control Room (`sources/controlRoom.ts`) | NexusInfra Control Room `GET /status` + `/uptime` | nodes (names matching `NW_NODE_PATTERN`) and service heartbeat sources, dead-letter depth |
 | Prometheus (`sources/prometheus.ts`) | NexusInfra `/metrics`, text format; only request counters (the gateway's own `nexusinfra_gateway_requests_total` too — it has no duration histogram, so no p95), the duration histogram, dead letters, outbox depth, agent containers | Overview requests/5xx and p95, queue depth, containers running |
 | Event bus (`sources/bus.ts`) | `monitoring.heartbeat.#` on `finvault.events`, payloads via `readPayload()` | nodes with CPU / memory / disk, service heartbeats |
+| Business events (`sources/business.ts`) | `bank.payment.#`, `events.#`, `billing.#`, `infra.#` on the same queue; each event stored once, ids and amounts only | top-ups, payments, transfers, suspensions, bus throughput (`views/business.ts`) |
 
 - A failed check is stored with `null` latency, never 0. The Nth failure in a row
   (`NW_HEALTH_FAILURES_FOR_INCIDENT`, default 3) opens an incident; the next good check closes it.
@@ -91,15 +92,18 @@ built with `VITE_USE_MOCKS=false`, served by nginx, which proxies `/api` to the 
 
 - **Agent**: the `nexuswatch/agent` container shown in Settings (heartbeats, metrics, logs, container
   inventory), authenticated with a per-node token. Until then Settings → Agents is sample data.
-- **FinVault business data**: top-ups, payments, transactions and request rates from FinVault's
-  gateway events (`bank.payment.*` and `events.<type>` keys on the same exchange).
+- **What the bus cannot show**: the Billing Bridge's credit ledger, account standing and revenue per
+  plan (its HTTP API takes NexusInfra's internal token, which can also change credit — not for a
+  read-only observer; a `billing.credit.*` event from the bridge would close the gap), FinVault's
+  invoices, FX, wallet types and security counters, queue depths (the broker's management API), the
+  node agent's container list, and FinVault request rates.
 - **Escalation policy steps** acting on delivery, and sources for the FinVault rule metrics (queue depth, 5xx rate, top-ups).
 
-- **Business view** (`/business`): the collector would read the Billing Bridge's top-up ledger, credit
-  ledger, standing and suspensions (hosted edition only), watch `payment.request` and FinVault's
-  `payment.confirmed`/`payment.failed` on the exchange (both key spellings), and ask the broker for queue
-  depths, consumers and `finvault.events.dlq`. It reports what each side recorded; the dashboard
-  reconciles (`lib/reconcile.ts`). Payer emails are masked before they leave the collector.
+- **Business view** (`/business`): built from the bus — `payment.request` and FinVault's
+  `payment.confirmed`/`payment.failed` matched on the reference, `billing.server.suspend` until the
+  server starts again, throughput per minute, dead letters and outboxes from the scrape. The credit
+  ledger and standing are not observed (see above); the dashboard reconciles what is
+  (`lib/reconcile.ts`). Payer emails are masked before they are stored.
 
 Open decisions: authentication for the dashboard; whether the collector should measure node
 resources itself or keep relying on NexusInfra's heartbeats.

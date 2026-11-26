@@ -20,6 +20,8 @@ export interface Live {
   requests: boolean;
   /** Prometheus or Control Room → queue depths (dead letters, outbox). */
   queues: boolean;
+  /** Bus → top-ups, payments, transfers, billing (views/business.ts). */
+  business: boolean;
   /** Any of the above writes logs and opens incidents. */
   logs: boolean;
 }
@@ -46,6 +48,7 @@ export function liveFor(config: Config): Live {
     nodeMetrics: Boolean(config.bus),
     requests,
     queues: requests || Boolean(config.controlRoom),
+    business: Boolean(config.bus),
     logs: services || nodes,
   };
 }

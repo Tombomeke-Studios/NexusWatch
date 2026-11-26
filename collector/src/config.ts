@@ -35,6 +35,8 @@ export interface Config {
   controlRoom: { url: string; intervalMs: number; nodePattern: RegExp } | null;
   metrics: { targets: MetricsTarget[]; intervalMs: number; token: string | undefined };
   bus: { url: string; queue: string } | null;
+  /** NexusInfra's billing settings, so the dashboard judges top-ups by the bridge's own clock. */
+  business: { topUpTimeoutMs: number; lowCreditHours: number };
   pruneIntervalMs: number;
   /** How often alert rules are evaluated against the stored measurements. */
   rulesIntervalMs: number;
@@ -178,6 +180,8 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
       token: env.NW_METRICS_TOKEN || undefined,
     },
     bus: env.NW_RABBITMQ_URL ? { url: env.NW_RABBITMQ_URL, queue: env.NW_RABBITMQ_QUEUE || 'nexuswatch.collector' } : null,
+    // Defaults are the Billing Bridge's (TOPUP_TIMEOUT_MS, LOW_CREDIT_HOURS); set them to match NexusInfra's.
+    business: { topUpTimeoutMs: num(env, 'NW_TOPUP_TIMEOUT_MS', 30 * 60_000), lowCreditHours: num(env, 'NW_LOW_CREDIT_HOURS', 24) },
     pruneIntervalMs: num(env, 'NW_PRUNE_INTERVAL_MS', 3_600_000),
     rulesIntervalMs: Math.max(1_000, num(env, 'NW_RULES_INTERVAL_MS', 15_000)),
     notify: {
