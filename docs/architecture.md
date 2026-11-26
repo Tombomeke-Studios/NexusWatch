@@ -33,7 +33,7 @@ with an injected `fetch` and clock so it is tested without a network:
 |---|---|---|
 | Heartbeat checker (`sources/health.ts`) | `GET` every configured `/health`, own interval + timeout per target | services, monitors, service detail, logs, incidents |
 | Control Room (`sources/controlRoom.ts`) | NexusInfra Control Room `GET /status` + `/uptime` | nodes (names matching `NW_NODE_PATTERN`) and service heartbeat sources, dead-letter depth |
-| Prometheus (`sources/prometheus.ts`) | NexusInfra `/metrics`, text format; only request counters, the duration histogram, dead letters, outbox depth, agent containers | Overview requests/5xx and p95, queue depth, containers running |
+| Prometheus (`sources/prometheus.ts`) | NexusInfra `/metrics`, text format; only request counters (the gateway's own `nexusinfra_gateway_requests_total` too — it has no duration histogram, so no p95), the duration histogram, dead letters, outbox depth, agent containers | Overview requests/5xx and p95, queue depth, containers running |
 | Event bus (`sources/bus.ts`) | `monitoring.heartbeat.#` on `finvault.events`, payloads via `readPayload()` | nodes with CPU / memory / disk, service heartbeats |
 
 - A failed check is stored with `null` latency, never 0. The Nth failure in a row

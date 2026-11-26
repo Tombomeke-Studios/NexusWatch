@@ -72,6 +72,25 @@ describe('PrometheusScraper', () => {
     expect(store.latestSamples('requests')[0].value).toBeCloseTo(2);
   });
 
+  it("reads the gateway's own request counter, which has no duration histogram", () => {
+    // services/gateway/src/gateway.ts: one counter by route prefix, outcome and status class.
+    const gateway = (ok: number, failed: number) =>
+      [
+        '# TYPE nexusinfra_gateway_requests_total counter',
+        `nexusinfra_gateway_requests_total{route="/api",outcome="proxied",status="2xx"} ${ok}`,
+        `nexusinfra_gateway_requests_total{route="/api",outcome="upstream_error",status="5xx"} ${failed}`,
+        'nexusinfra_build_info{service="gateway",version="0.4.1",edition="hosted"} 1',
+        '',
+      ].join('\n');
+    const store = new Store();
+    const scraper = new PrometheusScraper(store, async () => new Response(''), () => 0);
+    scraper.ingest('gateway', parsePrometheus(gateway(100, 0)), 1000);
+    scraper.ingest('gateway', parsePrometheus(gateway(140, 10)), 11_000);
+    expect(store.latestSamples('requests')).toEqual([{ series: 'gateway', ts: 11_000, value: 5 }]);
+    expect(store.latestSamples('errors5xx')[0].value).toBeCloseTo(1);
+    expect(store.hasSamples('latency_p95')).toBe(false);
+  });
+
   it('sends the bearer token and fails on a non-2xx scrape', async () => {
     const store = new Store();
     let auth = '';
