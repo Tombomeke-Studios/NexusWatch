@@ -65,8 +65,12 @@ _(no active branch)_
 
 ### Infra
 - [ ] CI workflow (build, lint, test) — once a remote exists (#—)
+- [ ] Per-target metrics token (`NW_METRICS_TOKEN` is one token for every target; hosted and community NexusInfra may differ) (#—)
+- [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `claude/eloquent-einstein-u98csl` (gateway scrape) — merged into `dev`
+- [x] Read the NexusInfra gateway's own `nexusinfra_gateway_requests_total` (no histogram, so no p95) (#—)
 ### `feature/rule-evaluation` — merged into `dev`
 - [x] Evaluate alert rules in the collector with `lib/rules.ts` semantics (for-duration, unknown ≠ 0): latency, CPU, memory, disk (#—)
 - [x] A firing rule opens an alert with its real rule id, current value and trend; it resolves when the condition clears or the rule is switched off or deleted (#—)
