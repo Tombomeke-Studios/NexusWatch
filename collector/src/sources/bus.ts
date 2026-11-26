@@ -1,5 +1,6 @@
 /**
- * RabbitMQ consumer for `monitoring.heartbeat.#` on the shared `finvault.events` exchange.
+ * RabbitMQ consumer for `monitoring.heartbeat.#` on the shared `finvault.events` exchange, plus the
+ * business events (`sources/business.ts`) when a recorder is given.
  *
  * Read-only by design: the exchange is only *checked* (never declared, never renamed — NexusInfra
  * and FinVault own it); NexusWatch binds its own exclusive, auto-deleting queue, so nothing is left
@@ -7,6 +8,7 @@
  * Payloads are read with `readPayload()` (they may be AES-256-GCM encrypted).
  */
 import type { Store } from '../store.js';
+import { BUSINESS_BINDINGS, type BusinessRecorder } from './business.js';
 import { recordSource } from './heartbeat.js';
 import { readPayload, type EventEnvelope } from './payload.js';
 import type { Clock } from './types.js';
@@ -42,11 +44,18 @@ export class HeartbeatConsumer {
     private readonly store: Store,
     private readonly clock: Clock,
     private readonly messageKey: string | undefined = process.env.FINVAULT_MESSAGE_KEY,
+    private readonly business: BusinessRecorder | null = null,
   ) {}
+
+  /** Every routing key the queue is bound to. */
+  bindings(): string[] {
+    return [BINDING, ...(this.business ? BUSINESS_BINDINGS : [])];
+  }
 
   /** Handles one message. Never throws: a bad message is logged, not retried. */
   handle(routingKey: string, content: Buffer): void {
     const now = this.clock();
+    this.business?.heard(now);
     let envelope: EventEnvelope;
     try {
       envelope = JSON.parse(content.toString('utf8')) as EventEnvelope;
@@ -58,7 +67,7 @@ export class HeartbeatConsumer {
     try {
       payload = readPayload(envelope.event, this.messageKey);
     } catch (err) {
-      this.warnOnce(envelope.source ?? routingKey, now, `could not read heartbeat payload from ${envelope.source}: ${err instanceof Error ? err.message : err}`);
+      this.warnOnce(envelope.source ?? routingKey, now, `could not read the ${envelope.event?.type ?? routingKey} payload from ${envelope.source}: ${err instanceof Error ? err.message : err}`);
       return;
     }
     this.lastError.delete(envelope.source ?? routingKey);
@@ -91,7 +100,9 @@ export class HeartbeatConsumer {
     if (envelope.event?.type === 'heartbeat.service') {
       const name = typeof payload.name === 'string' ? payload.name : envelope.source;
       recordSource(this.store, { name, kind: 'service', status: 'up', lastSeen: now, uptimePct: null, origin: 'bus', detail: {} }, now);
+      return;
     }
+    this.business?.record(routingKey, envelope, payload, now);
   }
 
   /** CPU / memory / disk in %, per node. A value the agent did not measure is not stored. */
@@ -111,7 +122,7 @@ export class HeartbeatConsumer {
   async attach(channel: BusChannel, queue: string): Promise<void> {
     await channel.checkExchange(EXCHANGE);
     const { queue: name } = await channel.assertQueue(queue, { exclusive: true, autoDelete: true, durable: false });
-    await channel.bindQueue(name, EXCHANGE, BINDING);
+    for (const pattern of this.bindings()) await channel.bindQueue(name, EXCHANGE, pattern);
     await channel.consume(name, (msg) => msg && this.handle(msg.fields.routingKey, msg.content), { noAck: true });
   }
 }
