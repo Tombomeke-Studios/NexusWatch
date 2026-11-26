@@ -93,6 +93,8 @@ describe('business mock', () => {
 
   it('keeps the bridge rules: not sent is failed, never pending; an expired top-up has no answer before its expiry', () => {
     for (const t of b.topUps) {
+      // The ledger is observed whole or not at all: status and credits are both null or both set.
+      expect(t.status === null).toBe(t.credits === null);
       if (!t.sent) expect(t.status).toBe('failed');
       if (t.expiredAt && t.finvault) expect(new Date(t.finvault.at).getTime()).not.toBe(new Date(t.expiredAt).getTime());
     }

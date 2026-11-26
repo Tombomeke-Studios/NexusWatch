@@ -14,6 +14,7 @@
 .biz-step.late { color: var(--warn); }
 .biz-step.waiting > i { border-color: var(--c-sky); border-style: dashed; }
 .biz-step.skipped > i { border-color: var(--border2); }
+.biz-step.unknown > i { border-color: var(--border2); border-style: dotted; }
 .biz-step.skipped { color: var(--subtle); }
 .biz-join { flex: 1 1 12px; min-width: 12px; height: 2px; background: var(--border2); margin-bottom: 16px; }
 

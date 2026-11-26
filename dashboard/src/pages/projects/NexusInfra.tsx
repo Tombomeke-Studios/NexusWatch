@@ -53,7 +53,7 @@ function Body({ data }: { data: NexusInfraData }) {
         <Kpi label="Nodes online" value={k.nodesOnline} unit={`/ ${k.nodesTotal}`} foot={<span style={{ color: 'var(--warn)' }}>{k.nodeNote}</span>} />
         <Kpi label="Containers running" value={k.containersRunning} unit={`/ ${k.containersTotal}`} foot={k.containersNote} />
         <Kpi label="CPU average" value={k.cpuPct} unit="%" foot={<Meter pct={k.cpuPct} color="var(--c-nx)" />} />
-        <Kpi label="Memory" value={k.memoryUsedGb} unit={`/ ${k.memoryTotalGb} GB`} foot={<Meter pct={(k.memoryUsedGb / k.memoryTotalGb) * 100} color="var(--c-nx)" />} />
+        <Kpi label="Memory" value={k.memoryUsedGb} unit={`/ ${k.memoryTotalGb} GB`} foot={k.memoryTotalGb ? <Meter pct={(k.memoryUsedGb / k.memoryTotalGb) * 100} color="var(--c-nx)" /> : <span className="subtle">no node reports memory</span>} />
         <Kpi accent="nx" label="Payments" labelColor="var(--primary)" swatch="var(--c-nx)" value={formatEur(k.paymentsMonthEur, true)} foot="this month · via FinVault" />
       </section>
 
@@ -67,7 +67,7 @@ function Body({ data }: { data: NexusInfraData }) {
       </section>
 
       <Card labelledBy="ct">
-        <CardHeader id="ct" title="Containers" hint={`${data.containers.length} total`} link={{ to: routes.logs, label: 'Open logs' }} />
+        <CardHeader id="ct" title="Containers" hint={`${data.containers.length || data.kpis.containersTotal} total`} link={{ to: routes.logs, label: 'Open logs' }} />
         <div className="tbl">
           <div className="tr th" style={{ minWidth: 760 }}>
             <span style={{ flex: '2 1 170px' }}>Name</span>
@@ -79,6 +79,11 @@ function Body({ data }: { data: NexusInfraData }) {
             <span className="r" style={{ flex: '1 1 80px' }}>Uptime</span>
             <span className="r" style={{ flex: '0 0 60px' }}>Restarts</span>
           </div>
+          {data.containers.length === 0 && (
+            <p className="muted" style={{ margin: 0, padding: '14px 20px' }}>
+              {data.kpis.containersRunning} running of {data.kpis.containersTotal} — the list per container needs the node agent's API, which takes NexusInfra's internal token.
+            </p>
+          )}
           {data.containers.map((c) => (
             <div key={c.name} className="tr" style={{ minWidth: 760 }}>
               <span className="mono" style={{ flex: '2 1 170px', fontWeight: 500 }}>{c.name}</span>

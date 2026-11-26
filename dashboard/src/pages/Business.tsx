@@ -25,6 +25,7 @@ const FILTERS = [
 
 const OUTCOME: Record<Outcome, { tone: string; label: string }> = {
   credited: { tone: 'p-ok', label: 'credited' },
+  confirmed: { tone: 'p-ok', label: 'confirmed' },
   failed: { tone: 'p-mute', label: 'failed' },
   'in-flight': { tone: 'p-info', label: 'in flight' },
   'not-confirmed': { tone: 'p-warn', label: 'not confirmed' },
@@ -60,7 +61,9 @@ export function BusinessPage() {
 function Body({ data, now }: { data: BusinessData; now: number }) {
   const rows = useMemo(() => reconcileAll(data.topUps, { now: new Date(now), timeoutMs: data.topUpTimeoutMs }), [data, now]);
   const s = summarize(rows);
-  const creditedEur = rows.filter((r) => r.outcome === 'credited').reduce((sum, r) => sum + r.record.amountEur, 0);
+  const creditedEur = rows.filter((r) => r.outcome === 'credited' || r.outcome === 'confirmed').reduce((sum, r) => sum + r.record.amountEur, 0);
+  // A bus-only backend sees FinVault's confirmation, not the bridge's credit (credits: null).
+  const creditsSeen = rows.every((r) => r.record.credits !== null);
 
   return (
     <>
@@ -69,10 +72,10 @@ function Body({ data, now }: { data: BusinessData; now: number }) {
         <span className="subtle small">payment.request → FinVault → NexusInfra wallet · last 7 days · timeout {formatDuration(data.topUpTimeoutMs / 1000)}</span>
       </div>
       <section className="kpis" aria-label="Reconciliation figures">
-        <Kpi accent="fv" label="Success rate" value={s.successRate === null ? 'unknown' : formatPercent(s.successRate, 1)} foot={`${s.credited} of ${s.settled} settled credited · ${s.inFlight} in flight`} />
-        <Kpi label="Median time to credit" value={s.medianTimeToCreditMs === null ? 'unknown' : formatDuration(s.medianTimeToCreditMs / 1000)} foot="request → credit, includes paying in FinVault" />
+        <Kpi accent="fv" label="Success rate" value={s.successRate === null ? 'unknown' : formatPercent(s.successRate, 1)} foot={`${s.credited + s.confirmed} of ${s.settled} settled ${creditsSeen ? 'credited' : 'confirmed'} · ${s.inFlight} in flight`} />
+        <Kpi label="Median time to credit" value={s.medianTimeToCreditMs === null ? 'unknown' : formatDuration(s.medianTimeToCreditMs / 1000)} foot={creditsSeen ? 'request → credit, includes paying in FinVault' : 'the bridge publishes no credit event'} />
         <Kpi label="Open anomalies" value={s.openAnomalies} valueColor={s.openAnomalies ? 'var(--down)' : 'var(--ok)'} foot={s.notedAnomalies ? `+ ${s.notedAnomalies} noted (healed on its own)` : 'none noted'} />
-        <Kpi accent="nx" label="Credited" value={formatEur(creditedEur, true)} foot={`${s.credited} top-ups into NexusInfra wallets`} />
+        <Kpi accent="nx" label={creditsSeen ? 'Credited' : 'Confirmed'} value={formatEur(creditedEur, true)} foot={creditsSeen ? `${s.credited} top-ups into NexusInfra wallets` : `${s.confirmed} top-ups confirmed by FinVault`} />
       </section>
 
       <Anomalies rows={rows} />
@@ -101,7 +104,11 @@ function Anomalies({ rows }: { rows: ReconciledTopUp[] }) {
     <Card labelledBy="an">
       <CardHeader id="an" title="Anomalies" hint={items.length ? `${items.length} found` : undefined} />
       {items.length === 0 ? (
-        <EmptyState>No anomalies — every settled top-up was credited once, for the amount asked.</EmptyState>
+        <EmptyState>
+          {rows.every((r) => r.record.credits !== null)
+            ? 'No anomalies — every settled top-up was credited once, for the amount asked.'
+            : 'No anomalies in what the bus shows — FinVault answered every settled top-up, for the amount asked. Credits are not observed.'}
+        </EmptyState>
       ) : (
         <div>
           {items.map((a) => (
@@ -122,15 +129,16 @@ function Anomalies({ rows }: { rows: ReconciledTopUp[] }) {
 
 function stepLabels(r: ReconciledTopUp): [string, string, string] {
   const { record, steps } = r;
-  const n = record.credits.length;
+  const n = record.credits?.length ?? 0;
   const request = steps.request === 'done' ? 'sent' : 'not sent';
-  const finvault = { done: 'confirmed', late: 'confirmed late', waiting: 'waiting', failed: record.finvault ? 'failed' : 'no answer', skipped: '—' }[steps.finvault];
+  const finvault = { done: 'confirmed', late: 'confirmed late', waiting: 'waiting', failed: record.finvault ? 'failed' : 'no answer', skipped: '—', unknown: 'not observed' }[steps.finvault];
   const credit = {
     done: 'credited',
     late: 'credited',
     waiting: 'waiting',
     failed: n > 1 ? `credited ×${n}` : n === 1 ? 'credited ≠' : 'not credited',
     skipped: '—',
+    unknown: 'not observed',
   }[steps.credit];
   return [request, finvault, credit];
 }
@@ -218,10 +226,10 @@ function Credit({ data, now }: { data: BusinessData; now: number }) {
   return (
     <>
       <section className="kpis" aria-label="Credit figures">
-        <Kpi label="Low credit" value={low} valueColor={low ? 'var(--warn)' : undefined} foot={`under ${data.lowCreditHours} h of runtime left`} />
-        <Kpi label="Out of credit" value={out} valueColor={out ? 'var(--down)' : undefined} foot="starts answer 402" />
+        <Kpi label="Low credit" value={accounts.length ? low : 'unknown'} valueColor={low ? 'var(--warn)' : undefined} foot={`under ${data.lowCreditHours} h of runtime left`} />
+        <Kpi label="Out of credit" value={accounts.length ? out : 'unknown'} valueColor={out ? 'var(--down)' : undefined} foot="starts answer 402" />
         <Kpi label="Suspended servers" value={data.suspended.length} valueColor={data.suspended.length ? 'var(--down)' : undefined} foot="stopped by billing.server.suspend" />
-        <Kpi accent="nx" label="Revenue · 30 days" value={formatEur(total, true)} foot={`${data.revenueByPlan.length} plans`} />
+        <Kpi accent="nx" label="Revenue · 30 days" value={data.revenueByPlan.length ? formatEur(total, true) : 'unknown'} foot={data.revenueByPlan.length ? `${data.revenueByPlan.length} plans` : 'plans live in the bridge, not on the bus'} />
       </section>
 
       <div className="cols">
@@ -235,6 +243,7 @@ function Credit({ data, now }: { data: BusinessData; now: number }) {
               <span style={{ flex: '2 1 180px' }}>Left to spend</span>
               <span className="r" style={{ flex: '1 1 120px' }}>Standing</span>
             </div>
+            {accounts.length === 0 && <EmptyState>No account standing to show — the Billing Bridge keeps it in its own database; only low-credit warnings and suspensions reach the bus.</EmptyState>}
             {accounts.map((a, i) => {
               const st = states[i];
               const c = CREDIT[st];
@@ -287,6 +296,7 @@ function Credit({ data, now }: { data: BusinessData; now: number }) {
 
           <Card padded labelledBy="rv">
             <CardHeader flat id="rv" title="Revenue per plan" hint="usage charged · 30 days" />
+            {data.revenueByPlan.length === 0 && <EmptyState>Not measured — usage per plan is not published on the bus.</EmptyState>}
             <BarChart values={perDay} color="var(--c-nx)" height={90} label="Revenue per day, all plans, last 30 days" />
             <XAxis labels={axisLabels('30d')} />
             <div style={{ marginTop: 16 }}>
@@ -364,6 +374,7 @@ function Bus({ bus }: { bus: BusHealth }) {
             <span className="r" style={{ flex: '1 1 100px' }}>Consumers</span>
             <span className="r" style={{ flex: '1 1 80px' }}>Ready</span>
           </div>
+          {bus.queues.length === 0 && <EmptyState>Not measured — needs the broker's management API.</EmptyState>}
           {bus.queues.map((q) => (
             <div key={q.name} className="tr" style={{ minWidth: 720 }}>
               <span className="mono" style={{ flex: '2 1 220px' }}>{q.name}</span>

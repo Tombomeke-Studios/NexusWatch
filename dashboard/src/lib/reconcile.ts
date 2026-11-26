@@ -42,10 +42,11 @@ export interface Anomaly {
   reason: string;
 }
 
-/** Each step of the pipeline: `late` = done, but after the timeout. */
-export type StepState = 'done' | 'late' | 'waiting' | 'failed' | 'skipped';
+/** Each step of the pipeline: `late` = done, but after the timeout; `unknown` = nobody observed it. */
+export type StepState = 'done' | 'late' | 'waiting' | 'failed' | 'skipped' | 'unknown';
 
-export type Outcome = 'credited' | 'failed' | 'in-flight' | 'not-confirmed' | 'anomaly';
+/** `confirmed` = FinVault confirmed it and the credit itself was not observed (`credits: null`). */
+export type Outcome = 'credited' | 'confirmed' | 'failed' | 'in-flight' | 'not-confirmed' | 'anomaly';
 
 export interface ReconciledTopUp {
   record: TopUpRecord;
@@ -73,7 +74,9 @@ export function reconcile(record: TopUpRecord, { now, timeoutMs, graceMs = CREDI
   const requested = ms(record.requestedAt);
   const answer = record.finvault;
   const confirmed = answer?.outcome === 'confirmed';
-  const credits = record.credits;
+  // null = the credit ledger is not observed: every credit rule is skipped, never judged on [].
+  const creditsKnown = record.credits !== null;
+  const credits = record.credits ?? [];
   const creditedTotal = credits.reduce((sum, c) => sum + c.amountEur, 0);
   const anomalies: Anomaly[] = [];
   const add = (kind: AnomalyKind, severity: Severity, reason: string) => anomalies.push({ kind, severity, reason });
@@ -85,7 +88,7 @@ export function reconcile(record: TopUpRecord, { now, timeoutMs, graceMs = CREDI
   if (!record.sent) {
     // Not sent is not pending: nothing can answer it, and nothing should be credited.
     if (credits.length) add('credited-without-confirmation', 'critical', `Credited ${formatEur(creditedTotal)} for a request the broker never took.`);
-    return finish(record, { request: 'failed', finvault: 'skipped', credit: credits.length ? 'failed' : 'skipped' }, anomalies, null);
+    return finish(record, { request: 'failed', finvault: 'skipped', credit: creditsKnown && credits.length ? 'failed' : 'skipped' }, anomalies, null);
   }
 
   const confirmedAmountWrong = confirmed && !sameAmount(answer.amountEur, record.amountEur);
@@ -108,7 +111,7 @@ export function reconcile(record: TopUpRecord, { now, timeoutMs, graceMs = CREDI
       : `Credited ${formatEur(creditedTotal)} with no confirmation from FinVault.`);
   }
 
-  const overdueCredit = confirmed && !credits.length && !confirmedAmountWrong && t - ms(answer.at) > graceMs;
+  const overdueCredit = creditsKnown && confirmed && !credits.length && !confirmedAmountWrong && t - ms(answer.at) > graceMs;
   if (overdueCredit) {
     add('confirmed-not-credited', 'critical', `FinVault confirmed ${formatEur(answer.amountEur)} ${formatDuration((t - ms(answer.at)) / 1000)} ago, but there is no credit in the wallet.`);
   }
@@ -132,7 +135,8 @@ export function reconcile(record: TopUpRecord, { now, timeoutMs, graceMs = CREDI
     : answer.outcome === 'failed' ? 'failed' : late ? 'late' : 'done';
 
   let credit: StepState;
-  if (credits.length) credit = anomalies.some((a) => a.severity === 'critical') ? 'failed' : 'done';
+  if (!creditsKnown) credit = answer?.outcome === 'failed' || finvault === 'failed' ? 'skipped' : confirmedAmountWrong ? 'failed' : confirmed ? 'unknown' : 'waiting';
+  else if (credits.length) credit = anomalies.some((a) => a.severity === 'critical') ? 'failed' : 'done';
   else if (confirmed) credit = overdueCredit || confirmedAmountWrong ? 'failed' : 'waiting';
   else credit = answer?.outcome === 'failed' || finvault === 'failed' ? 'skipped' : 'waiting';
 
@@ -147,6 +151,7 @@ function finish(record: TopUpRecord, steps: ReconciledTopUp['steps'], anomalies:
     ? 'anomaly'
     : open ? 'not-confirmed'
     : steps.credit === 'done' ? 'credited'
+    : steps.credit === 'unknown' ? 'confirmed'
     : steps.request === 'failed' || steps.finvault === 'failed' ? 'failed'
     : 'in-flight';
   return { record, steps, outcome, anomalies, timeToCreditMs };
@@ -162,7 +167,9 @@ export interface ReconcileSummary {
   /** Everything that has an outcome: credited, failed, not confirmed or wrong. */
   settled: number;
   credited: number;
-  /** credited / settled in percent; null when nothing has settled (unknown is not zero). */
+  /** Confirmed by FinVault with the credit not observed. */
+  confirmed: number;
+  /** (credited + confirmed) / settled in percent; null when nothing has settled (unknown is not zero). */
   successRate: number | null;
   medianTimeToCreditMs: number | null;
   /** Critical + warning anomalies — the ones someone has to look at. */
@@ -186,13 +193,15 @@ export function summarize(rows: ReconciledTopUp[]): ReconcileSummary {
   const inFlight = rows.filter((r) => r.outcome === 'in-flight').length;
   const settled = rows.length - inFlight;
   const credited = rows.filter((r) => r.outcome === 'credited').length;
+  const confirmed = rows.filter((r) => r.outcome === 'confirmed').length;
   const times = rows.filter((r) => r.outcome === 'credited' && r.timeToCreditMs !== null).map((r) => r.timeToCreditMs as number);
   return {
     total: rows.length,
     inFlight,
     settled,
     credited,
-    successRate: settled ? (credited / settled) * 100 : null,
+    confirmed,
+    successRate: settled ? ((credited + confirmed) / settled) * 100 : null,
     medianTimeToCreditMs: median(times),
     openAnomalies,
     notedAnomalies,

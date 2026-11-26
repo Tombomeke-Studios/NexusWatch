@@ -144,6 +144,34 @@ describe('reconcile', () => {
   });
 });
 
+describe('credits not observed (bus-only backend)', () => {
+  const unseen = (patch: Partial<TopUpRecord> = {}) => topUp({ status: null, credits: null, ...patch });
+
+  it('calls a confirmed top-up confirmed, never credited and never "not credited"', () => {
+    const r = reconcile(unseen(), { now: NOW, timeoutMs: TIMEOUT });
+    expect(r.anomalies).toEqual([]);
+    expect(r.outcome).toBe('confirmed');
+    expect(r.steps).toEqual({ request: 'done', finvault: 'done', credit: 'unknown' });
+    expect(r.timeToCreditMs).toBeNull();
+  });
+
+  it('still flags what the bus shows: an amount mismatch and a top-up stuck without answer', () => {
+    expect(kinds(unseen({ finvault: { outcome: 'confirmed', at: at(55), amountEur: 20, reason: null } }))).toEqual(['amount-mismatch']);
+    expect(kinds(unseen({ finvault: null }))).toEqual(['stuck-not-confirmed']);
+  });
+
+  it('skips the wallet step after a failure and waits while FinVault has not answered', () => {
+    expect(reconcile(unseen({ finvault: { outcome: 'failed', at: at(50), amountEur: 25, reason: 'declined' } }), { now: NOW, timeoutMs: TIMEOUT }).steps.credit).toBe('skipped');
+    expect(reconcile(unseen({ requestedAt: at(5), finvault: null }), { now: NOW, timeoutMs: TIMEOUT })).toMatchObject({ outcome: 'in-flight', steps: { credit: 'waiting' } });
+  });
+
+  it('counts confirmed top-ups as succeeded in the summary', () => {
+    const s = summarize(reconcileAll([unseen(), topUp(), unseen({ finvault: { outcome: 'failed', at: at(50), amountEur: 25, reason: null } })], { now: NOW, timeoutMs: TIMEOUT }));
+    expect(s).toMatchObject({ settled: 3, credited: 1, confirmed: 1 });
+    expect(s.successRate).toBeCloseTo(66.67, 1);
+  });
+});
+
 describe('summarize', () => {
   const opts = { now: NOW, timeoutMs: TIMEOUT };
 
