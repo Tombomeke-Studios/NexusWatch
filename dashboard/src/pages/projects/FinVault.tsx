@@ -77,7 +77,7 @@ function Body({ data }: { data: FinVaultData }) {
       <div className="cols">
         <Card padded labelledBy="tu" style={{ flex: '2 1 460px', minWidth: 0 }}>
           <CardHeader flat id="tu" title="Top-ups per hour" hint="count" />
-          <BarChart values={data.topupsPerHour} color="var(--c-fv)" height={130} label="Top-ups per hour" />
+          <BarChart values={data.topupsPerHour} slots={24} color="var(--c-fv)" height={130} label="Top-ups per hour" />
           <XAxis labels={['00:00', '06:00', '12:00', '18:00', 'now']} />
         </Card>
         <Card padded labelledBy="wt" style={{ flex: '1 1 320px', minWidth: 0 }}>

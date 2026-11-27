@@ -17,7 +17,7 @@ export function HostCard() {
         <br />
         uptime {formatDuration(host.uptimeSeconds)}
         <br />
-        {host.nodesConnected} nodes connected
+        {host.nodesConnected ? `${host.nodesConnected} node${host.nodesConnected === 1 ? '' : 's'} connected` : 'no nodes reporting'}
       </div>
     </div>
   );

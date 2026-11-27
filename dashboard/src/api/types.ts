@@ -139,9 +139,11 @@ export interface OverviewData {
     p95Trend: number[];
     openAlerts: number;
     openAlertsSummary: string;
-    topupsToday: number;
+    /** null = not measured (the collector has no event bus to read top-ups from). */
+    topupsToday: number | null;
     topupsTrend: number[];
-    paymentsMonthEur: number;
+    /** null = not measured, like `topupsToday`. */
+    paymentsMonthEur: number | null;
     paymentsTrend: number[];
   };
   services: ServiceSummary[];

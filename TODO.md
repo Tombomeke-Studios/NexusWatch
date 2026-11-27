@@ -13,8 +13,6 @@ _(no active branch)_
 - [ ] Business: account standing, credits and revenue per plan need a `billing.credit.*` event from NexusInfra's Billing Bridge (its HTTP API takes the internal token, which can also change credit) (#—)
 - [ ] FinVault page: invoices, FX, wallet types, security counters and RabbitMQ queue depths have no read-only source (management API, FinVault events) (#—)
 - [ ] NexusInfra page: containers on other nodes than the collector's host (only the local Docker socket is read); nodes without memory in their heartbeat read 0 / 0 GB (#—)
-- [ ] Overview top-up / payment tiles read 0 without a bus — make them nullable (#—)
-- [ ] `npm run dev` crashes when the root `.env` is missing (`node --watch` with `--env-file-if-exists`) (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
 - [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
 - [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
@@ -25,10 +23,6 @@ _(no active branch)_
 - [ ] FinVault rps / error % per service (no `/metrics` in FinVault) (#—)
 - [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
 - [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
-- [ ] Alerts for heartbeat sources link to `/services/<source>`, which 404s for nodes — link nodes to Heartbeats instead (#—)
-- [ ] Charts: align a live series that is shorter than the window to the right of the time axis (#—)
-- [ ] Heartbeats card says "every 30 s" — show the configured interval from the API (#—)
-- [ ] Host card shows sample "nodes connected" when no node source is configured — say "no node source" instead (#—)
 - [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
 - [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
 
@@ -40,7 +34,6 @@ _(no active branch)_
 - [ ] Incidents: edit postmortem and tick action items after resolving; link alerts to the incident they opened (#—)
 - [ ] Maintenance windows: create/edit in the dashboard, and mute alerts during them (#—)
 - [ ] Serve `/status` from a separate, unauthenticated origin once authentication lands; cache it (#—)
-- [ ] Service detail at 390 px: the 120-check strip (3 px gap) is ~600 px wide and scrolls the page sideways — existed before this branch (#—)
 
 - [ ] Storage with retention per data kind (logs / metrics / heartbeats) (#—)
 - [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
@@ -57,7 +50,6 @@ _(no active branch)_
 - [ ] Offline banner when the service worker serves the cached shell and `/api` is unreachable (#—)
 - [ ] Web push for alerts on the installed PWA (needs the backend's notification delivery) (#—)
 - [ ] Accessibility pass with axe in both themes (#—)
-- [ ] Overview "Recent events": make events clickable the same way as service logs (#—)
 - [ ] Code-split pages (bundle is 444 kB before gzip) (#—)
 - [ ] Business: click a top-up to see its events on the bus and the bridge's log lines (`routes.logsFor(reference)`) once the collector indexes references (#—)
 - [ ] Business: raise reconciliation anomalies as alerts (rules on `confirmed-not-credited`, `credited-twice`, DLQ depth > 0) (#—)
@@ -73,6 +65,11 @@ _(no active branch)_
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `feature/polish` — merged into `dev`
+- [x] `npm run dev` starts without a root `.env`; `/health` reports the package version (#—)
+- [x] Charts draw a short live series against "now" (`slots`); the requests chart scales to its data (`niceMax`) (#—)
+- [x] Node / bus-source alerts link to Heartbeats; host card says "no nodes reporting"; Overview events open the line in Logs (#—)
+- [x] Overview top-up / payment tiles are unknown (null) without a bus; every page checked at 390 px and 1440 px for overflow and errors (#—)
 ### `feature/notification-setup` — merged into `dev`
 - [x] Set up Discord, Telegram, ntfy and email in Settings: write-only, validated (fixed hosts, no local/metadata addresses), `NW_*` wins (#—)
 - [x] "Test now" on Service detail runs a real health check; Overview shows the real check interval (#—)

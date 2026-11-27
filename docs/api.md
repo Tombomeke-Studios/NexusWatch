@@ -113,7 +113,7 @@ lists which parts are live.
 
 **No sample data once a source is set.** With any source configured, every endpoint answers from what
 the collector measured; a part without a source answers empty or unknown (`series: []`, `–` summaries,
-empty lists, 0 counts). SLOs are one availability objective per health target (`NW_SLO_TARGET`, 30 days;
+empty lists, 0 counts; the Overview's `topupsToday` / `paymentsMonthEur` are `null` without a bus). SLOs are one availability objective per health target (`NW_SLO_TARGET`, 30 days;
 a check that answered is good). `/incidents` lists declared incidents and the collector's own (health
 checks, heartbeat sources, rules; never public). `/status` has one component per health target, by name
 only. With `NW_DOCKER_SOCKET`, top consumers, the NexusInfra container list and the memory, disk IO and

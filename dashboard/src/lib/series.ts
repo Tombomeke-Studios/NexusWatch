@@ -36,25 +36,47 @@ export function walk(seed: number, n: number, base: number, amp: number, opts: W
  * (0 at the bottom) with a 2px inset so a stroke at the edge is not clipped.
  * `width` lets a series stop short of the right edge (e.g. a service that went down).
  */
-export function linePath(values: readonly number[], w: number, h: number, max = 100, width = w): string {
+/**
+ * `slots`: how many points the whole window holds. A shorter (live, never padded) series is drawn
+ * against the right edge — its last point at "now" — instead of being stretched over the full width.
+ */
+export function linePath(values: readonly number[], w: number, h: number, max = 100, width = w, slots = values.length): string {
   if (values.length === 0) return '';
-  if (values.length === 1) {
+  const total = Math.max(slots, values.length);
+  if (total === 1) {
     const y = yFor(values[0], h, max);
     return `M0 ${y} L${width} ${y}`;
   }
-  const step = width / (values.length - 1);
-  return values.map((v, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)} ${yFor(v, h, max)}`).join(' ');
+  const step = width / (total - 1);
+  const offset = (total - values.length) * step;
+  if (values.length === 1) {
+    const y = yFor(values[0], h, max);
+    return `M${(offset - step / 2).toFixed(1)} ${y} L${width} ${y}`;
+  }
+  return values.map((v, i) => `${i ? 'L' : 'M'}${(offset + i * step).toFixed(1)} ${yFor(v, h, max)}`).join(' ');
 }
 
 /** Same as `linePath`, closed along the bottom edge for an area fill. */
-export function areaPath(values: readonly number[], w: number, h: number, max = 100): string {
-  const line = linePath(values, w, h, max);
-  return line ? `${line} L${w} ${h} L0 ${h} Z` : '';
+export function areaPath(values: readonly number[], w: number, h: number, max = 100, slots = values.length): string {
+  const line = linePath(values, w, h, max, w, slots);
+  if (!line) return '';
+  // Closes under the first point: at 0 for a full series, where the data starts for a short one.
+  const startX = slots > values.length ? (/^M(-?[\d.]+)/.exec(line)?.[1] ?? '0') : '0';
+  return `${line} L${w} ${h} L${startX} ${h} Z`;
 }
 
 function yFor(v: number, h: number, max: number): string {
   const clamped = Math.max(0, Math.min(max, v));
   return (h - (clamped / max) * (h - 4) - 2).toFixed(1);
+}
+
+/** A round upper bound for a chart's y axis: 1, 2, 2.5 or 5 × 10ⁿ above the peak. Never below `floor`. */
+export function niceMax(values: readonly number[], floor = 1): number {
+  const peak = Math.max(0, ...values);
+  if (peak <= floor) return floor;
+  const magnitude = 10 ** Math.floor(Math.log10(peak));
+  const step = [1, 2, 2.5, 5, 10].find((m) => m * magnitude >= peak * 1.1) ?? 10;
+  return step * magnitude;
 }
 
 export interface SeriesStats {

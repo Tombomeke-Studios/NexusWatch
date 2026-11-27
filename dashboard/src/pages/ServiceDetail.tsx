@@ -148,7 +148,7 @@ function ServiceBody({ data }: { data: ServiceDetail }) {
           {data.dependencies.map((chain, ci) => (
             <div key={ci} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: ci ? 14 : 0 }}>
               {chain.nodes.map((n, i) => (
-                <Fragment key={n.name}>
+                <Fragment key={`${i}-${n.name}`}>
                   <div className={`dep${n.status === 'down' ? ' bad' : ''}`}>
                     <span className="mono" style={{ fontWeight: 500 }}>{n.name}</span>
                     <Pill tone={statusPill[n.status]} style={{ alignSelf: 'flex-start' }}>{n.note}</Pill>

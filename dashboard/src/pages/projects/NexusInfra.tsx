@@ -120,7 +120,7 @@ function Body({ data }: { data: NexusInfraData }) {
         <Card labelledBy="pay" style={{ flex: '1 1 420px', minWidth: 0 }}>
           <CardHeader id="pay" title="Payments" hint="funded by FinVault top-ups" />
           <div style={{ padding: '16px 20px 4px' }}>
-            <BarChart values={data.paymentsPerDay} color="var(--c-nx)" label="Payments per day, last 30 days" />
+            <BarChart values={data.paymentsPerDay} slots={30} color="var(--c-nx)" label="Payments per day, last 30 days" />
             <XAxis labels={axisLabels('30d')} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', padding: '6px 8px 12px' }}>

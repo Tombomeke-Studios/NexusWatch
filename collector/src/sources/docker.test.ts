@@ -4,6 +4,7 @@ import { Store } from '../store.js';
 import { createCtx } from '../views/ctx.js';
 import { hostName, nexusInfraContainers, topContainers } from '../views/containers.js';
 import { metricsOverview } from '../views/metrics.js';
+import { overview } from '../views/pages.js';
 import { cpuPercent, DockerSource, memoryBytes, projectOf, type DockerApi } from './docker.js';
 
 const stats = (cpu: number, sys: number, mem: number, rx: number, io: number) => ({
@@ -72,6 +73,8 @@ describe('Docker source', () => {
     expect(summaries.find((s) => s.title === 'Containers running')?.value).toBe('3');
     expect(summaries.find((s) => s.title === 'Network in')?.value).not.toBe('31');
     expect(metricsOverview(ctx, '1h').topContainers).toEqual(top);
+    // No bus in this collector: money is unknown, not 0.
+    expect(overview(ctx, '24h').kpis).toMatchObject({ topupsToday: null, paymentsMonthEur: null });
   });
 
   it('prefers NW_HOST_NAME over the Docker host name', async () => {

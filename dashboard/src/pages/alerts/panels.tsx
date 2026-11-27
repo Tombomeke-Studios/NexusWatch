@@ -84,7 +84,12 @@ export function ActiveAlerts({ data }: { data: AlertsData }) {
               ) : (
                 <button type="button" className="btn" onClick={() => setMute({ kind: 'alert', id: a.id, label: a.title, canWaitForResolve: true })}>Mute…</button>
               )}
-              <Link className="btn" to={routes.service(a.serviceId)} style={{ color: 'var(--primary)' }}>Open service</Link>
+              {/* A node or bus source has no service page: send those to Heartbeats. */}
+              {data.services.some((s) => s.id === a.serviceId) ? (
+                <Link className="btn" to={routes.service(a.serviceId)} style={{ color: 'var(--primary)' }}>Open service</Link>
+              ) : (
+                <Link className="btn" to={routes.heartbeats} style={{ color: 'var(--primary)' }}>Open heartbeats</Link>
+              )}
               {rule?.runbookUrl && <a className="btn" href={rule.runbookUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Runbook ↗</a>}
             </div>
           </article>

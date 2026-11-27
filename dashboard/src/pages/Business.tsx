@@ -297,7 +297,7 @@ function Credit({ data, now }: { data: BusinessData; now: number }) {
           <Card padded labelledBy="rv">
             <CardHeader flat id="rv" title="Revenue per plan" hint="usage charged · 30 days" />
             {data.revenueByPlan.length === 0 && <EmptyState>Not measured — usage per plan is not published on the bus.</EmptyState>}
-            <BarChart values={perDay} color="var(--c-nx)" height={90} label="Revenue per day, all plans, last 30 days" />
+            <BarChart values={perDay} slots={30} color="var(--c-nx)" height={90} label="Revenue per day, all plans, last 30 days" />
             <XAxis labels={axisLabels('30d')} />
             <div style={{ marginTop: 16 }}>
               <StackBar parts={data.revenueByPlan.map((p) => ({ pct: total ? (p.revenueEur / total) * 100 : 0, color: chartColor(p.color) }))} label={`Share: ${data.revenueByPlan.map((p) => `${p.name} ${formatEur(p.revenueEur, true)}`).join(', ')}`} height={10} />
@@ -337,7 +337,7 @@ function Bus({ bus }: { bus: BusHealth }) {
             <span className="num biz-big">{last ?? <Unknown />}</span>
             <span className="muted small">now · avg {avg === null ? '—' : Math.round(avg)} · peak {max}</span>
           </div>
-          <BarChart values={bus.throughputPerMin} color="var(--c-fv)" height={90} label="Messages per minute on finvault.events, last hour" />
+          <BarChart values={bus.throughputPerMin} slots={60} color="var(--c-fv)" height={90} label="Messages per minute on finvault.events, last hour" />
           <XAxis labels={axisLabels('1h')} />
         </Card>
 
