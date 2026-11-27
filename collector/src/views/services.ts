@@ -1,4 +1,5 @@
 /** Services, monitors and the service detail page — from health checks when targets are configured. */
+import { monitorFlags } from '../monitors.js';
 import type { HealthTarget } from '../config.js';
 import type { HealthStatus, Monitor, ServiceCheckResult, ServiceDetail, ServiceSummary } from '../contract.js';
 import { runHealthCheck, trailingFailures } from '../sources/health.js';
@@ -89,14 +90,15 @@ export function monitors(ctx: Ctx): Monitor[] {
     const ms = answered(day);
     return {
       id: `mon_${t.id}`,
+      ...monitorFlags(ctx, t),
       serviceId: t.id,
       name: t.name,
       project: t.project,
       target: t.url,
       uptimePct: s.uptimePct,
       status: s.status,
-      // 0 only when no check answered in 24h; see TODO (make it nullable in the contract).
-      avgLatencyMs: ms.length ? round(ms.reduce((a, b) => a + b, 0) / ms.length) : 0,
+      // null when no check answered in 24 h: unknown, not 0.
+      avgLatencyMs: ms.length ? round(ms.reduce((a, b) => a + b, 0) / ms.length) : null,
       nowLatencyMs: s.latencyMs,
       days: dailyStatus(ctx.store.checks(t.id, now - DAYS * DAY_MS), now),
     };
@@ -147,6 +149,7 @@ export function serviceDetail(ctx: Ctx, id: string): ServiceDetail | null {
     service,
     target: t.url,
     intervalSeconds: seconds(t.intervalMs),
+    ...monitorFlags(ctx, t),
     downSince: downSince === null ? null : iso(downSince),
     failure: failures > 0 ? `${failures} check${failures === 1 ? '' : 's'} failed in a row · error: ${latest.note}` : null,
     kpis: {
@@ -154,8 +157,8 @@ export function serviceDetail(ctx: Ctx, id: string): ServiceDetail | null {
       downtime24hSeconds: seconds(day.filter((c) => c.status === 'down').length * t.intervalMs),
       uptime30d: uptimePct(month),
       incidents30d: incidents.length,
-      avgLatencyMs: ms.length ? round(ms.reduce((a, b) => a + b, 0) / ms.length) : 0,
-      p95LatencyMs: percentile(ms, 95) ?? 0,
+      avgLatencyMs: ms.length ? round(ms.reduce((a, b) => a + b, 0) / ms.length) : null,
+      p95LatencyMs: percentile(ms, 95),
       lastCheckAt: latest ? iso(latest.ts) : iso(now),
       lastCheckNote: latest?.note ?? 'not checked yet',
       // Container restarts need the agent; not measured yet.

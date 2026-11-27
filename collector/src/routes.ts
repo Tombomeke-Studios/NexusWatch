@@ -13,7 +13,8 @@ import type { Ctx } from './views/ctx.js';
 import { logs } from './views/logs.js';
 import { metric, metricsOverview } from './views/metrics.js';
 import { finVault, heartbeats, host, navCounts, nexusInfra, overview } from './views/pages.js';
-import { checkService, serviceDetail } from './views/services.js';
+import { checkService, monitors, serviceDetail } from './views/services.js';
+import { addMonitor, pauseMonitor, removeMonitor } from './monitors.js';
 import { sampledRoutes } from './views/sampled.js';
 import { settings, updateSettings, type SettingsPatch } from './views/settings.js';
 
@@ -115,6 +116,16 @@ export const routes: Route[] = [
     path: '/services/:id',
     handle: (ctx, { params }) => serviceDetail(ctx, params.id) ?? (() => { throw new HttpError(404, `Service ${params.id} not found`); })(),
   },
+  {
+    method: 'POST',
+    path: '/monitors',
+    handle: (ctx, { body }) => {
+      const { id } = addMonitor(ctx, body);
+      return monitors(ctx).find((m) => m.serviceId === id);
+    },
+  },
+  { method: 'DELETE', path: '/monitors/:id', handle: (ctx, { params }) => (removeMonitor(ctx, params.id), null) },
+  { method: 'PUT', path: '/monitors/:id/paused', handle: (ctx, { params, body }) => (pauseMonitor(ctx, params.id, body), null) },
   {
     method: 'POST',
     path: '/services/:id/check',

@@ -8,12 +8,13 @@ import {
   type Reading,
 } from '@/lib/rules';
 import { maskChannelTarget, validateChannelConfig } from '@/lib/channels';
+import { monitorId, validateMonitor } from '@/lib/monitors';
 import { ApiError } from '../client';
 import type {
   ActiveAlert, Agent, AlertHistoryItem, AlertRule, AlertsData, Channel, ContainerRow, ContainerUsage,
   FinVaultData, HealthStatus, HeartbeatsData, HostInfo, LogEntry, LogLevel, LogQuery, LogsData,
   MetricData, MetricId, MetricsOverview, Monitor, NavCounts, NexusInfraData, NodeSummary, OverviewData,
-  ProjectId, ServiceCheckResult, ServiceDetail, ServiceSummary, SettingsData,
+  NewMonitor, ProjectId, ServiceCheckResult, ServiceDetail, ServiceSummary, SettingsData,
 } from '../types';
 import { incidentSummaries } from './reliability';
 import type { AccountStanding, BusinessData, ChannelTestResult, PlanRevenue, TopUpRecord } from '../types';
@@ -242,7 +243,41 @@ function days(seed: number, down: number[], warn: number[]): HealthStatus[] {
 
 function monitor(serviceId: string, target: string, seed: number, down: number[], warn: number[], avgLatencyMs: number): Monitor {
   const s = byId(serviceId)!;
-  return { id: `mon_${serviceId}`, serviceId, name: s.name, project: s.project, target, uptimePct: s.uptimePct, status: s.status, avgLatencyMs, nowLatencyMs: s.latencyMs, days: days(seed, down, warn) };
+  return { id: `mon_${serviceId}`, serviceId, name: s.name, project: s.project, target, uptimePct: s.uptimePct, status: s.status, avgLatencyMs, nowLatencyMs: s.latencyMs, days: days(seed, down, warn), source: 'env', paused: pausedMonitors.has(serviceId) };
+}
+
+// Monitors added on Heartbeats (sample backend): kept in memory next to the sample services.
+const addedMonitors: { id: string; url: string; intervalSeconds: number }[] = [];
+const pausedMonitors = new Set<string>();
+
+export function addMonitor(input: NewMonitor): Monitor {
+  const result = validateMonitor(input);
+  if (!result.ok) throw new ApiError(422, `${result.field}: ${result.error}`);
+  const { name, project, url, intervalSeconds } = result.value;
+  const id = monitorId(name, services.map((s) => s.id));
+  const port = new URL(url).port;
+  services.push(svc(id, name, project, port ? `:${port}` : '', 'up', 40, 100, 90 + services.length));
+  addedMonitors.push({ id, url, intervalSeconds });
+  return addedMonitor(addedMonitors[addedMonitors.length - 1]);
+}
+
+function addedMonitor(m: { id: string; url: string }): Monitor {
+  const s = byId(m.id)!;
+  return { id: `mon_${m.id}`, serviceId: m.id, name: s.name, project: s.project, target: m.url, uptimePct: s.uptimePct, status: s.status, avgLatencyMs: s.latencyMs ?? 0, nowLatencyMs: s.latencyMs, days: [s.status], source: 'dashboard', paused: pausedMonitors.has(m.id) };
+}
+
+export function removeMonitor(id: string): void {
+  const i = addedMonitors.findIndex((m) => m.id === id);
+  if (i < 0) throw new ApiError(byId(id) ? 409 : 404, byId(id) ? `${id} comes from the collector's configuration` : `Monitor ${id} not found`);
+  addedMonitors.splice(i, 1);
+  services.splice(services.findIndex((s) => s.id === id), 1);
+  pausedMonitors.delete(id);
+}
+
+export function pauseMonitor(id: string, paused: boolean): void {
+  if (!byId(id)) throw new ApiError(404, `Monitor ${id} not found`);
+  if (paused) pausedMonitors.add(id);
+  else pausedMonitors.delete(id);
 }
 
 export function heartbeats(): HeartbeatsData {
@@ -255,6 +290,7 @@ export function heartbeats(): HeartbeatsData {
       monitor('fv-api-gateway', 'http://finvault:8000/health', 4, [], [8], 39),
       monitor('fv-wallet-service', 'http://finvault:8002/health', 5, [], [19, 20], 56),
       monitor('fv-invoice-service', 'http://finvault:8003/health', 6, [27, 59], [26], 51),
+      ...addedMonitors.map(addedMonitor),
     ],
     incidents: incidentSummaries(),
   };
@@ -632,8 +668,10 @@ export function serviceDetail(id: string): ServiceDetail | null {
       ];
   return {
     service,
-    target: `http://${service.project}${service.port}/health`,
-    intervalSeconds: 30,
+    target: addedMonitors.find((m) => m.id === service.id)?.url ?? `http://${service.project}${service.port}/health`,
+    intervalSeconds: addedMonitors.find((m) => m.id === service.id)?.intervalSeconds ?? 30,
+    source: addedMonitors.some((m) => m.id === service.id) ? 'dashboard' : 'env',
+    paused: pausedMonitors.has(service.id),
     downSince: isDown ? ago(16 * MIN) : null,
     failure: isDown ? `6 checks failed in a row · error: ECONNREFUSED 127.0.0.1${service.port} · alert sent to Discord and push` : null,
     kpis: { uptime24h: service.uptimePct, downtime24hSeconds: isDown ? 50 * MIN : 0, uptime30d: isDown ? 99.12 : 99.97, incidents30d: isDown ? 2 : 0, avgLatencyMs: 51, p95LatencyMs: 88, lastCheckAt: ago(4), lastCheckNote: isDown ? 'timed out after 5 s' : '200 OK', restarts24h: isDown ? 3 : 0 },

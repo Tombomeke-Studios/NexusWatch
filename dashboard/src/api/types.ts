@@ -71,10 +71,26 @@ export interface Monitor {
   target: string;
   uptimePct: number;
   status: HealthStatus;
-  avgLatencyMs: number;
+  /** null = no check answered in 24 h (unknown, not 0). */
+  avgLatencyMs: number | null;
   nowLatencyMs: number | null;
   /** One status per day, oldest first (60 entries). */
   days: HealthStatus[];
+  /** `env`: from the collector's NW_HEALTH_TARGETS (read-only here); `dashboard`: added on Heartbeats. */
+  source: MonitorSource;
+  /** Paused monitors are not checked; their history stays. */
+  paused: boolean;
+}
+
+export type MonitorSource = 'env' | 'dashboard';
+
+/** Body of `POST /monitors`. */
+export interface NewMonitor {
+  name: string;
+  project: ProjectId;
+  url: string;
+  /** One of 15, 30, 60, 120, 300; default 30. */
+  intervalSeconds?: number;
 }
 
 export interface Incident {
@@ -356,9 +372,12 @@ export interface ServiceDetail {
   service: ServiceSummary;
   target: string;
   intervalSeconds: number;
+  /** Where the monitor comes from and whether it is paused (see `Monitor`). */
+  source: MonitorSource;
+  paused: boolean;
   downSince: string | null;
   failure: string | null;
-  kpis: { uptime24h: number; downtime24hSeconds: number; uptime30d: number; incidents30d: number; avgLatencyMs: number; p95LatencyMs: number; lastCheckAt: string; lastCheckNote: string; restarts24h: number };
+  kpis: { uptime24h: number; downtime24hSeconds: number; uptime30d: number; incidents30d: number; avgLatencyMs: number | null; p95LatencyMs: number | null; lastCheckAt: string; lastCheckNote: string; restarts24h: number };
   /** Response time per check over 24h; null = no answer. */
   responseTimes: (number | null)[];
   checks: HealthStatus[];

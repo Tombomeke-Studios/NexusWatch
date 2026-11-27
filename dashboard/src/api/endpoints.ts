@@ -14,7 +14,7 @@ import type {
 import type {
   IncidentDetail, IncidentsData, NewIncident, NewIncidentUpdate, ResolveIncident, SloData, StatusPageData,
 } from './types';
-import type { AuthState, BusinessData, ChannelConfig, ChannelId, ChannelTestResult } from './types';
+import type { AuthState, Monitor, NewMonitor, BusinessData, ChannelConfig, ChannelId, ChannelTestResult } from './types';
 import type {
   AlertRule, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleTestResult, Silence,
   SilenceInput,
@@ -112,6 +112,14 @@ export const api = {
         }),
   login: (password: string): Promise<void> => request('/auth/login', { method: 'POST', body: json({ password }) }),
   logout: (): Promise<void> => request('/auth/logout', { method: 'POST' }),
+
+  /** Monitors added on Heartbeats (422 invalid; DELETE answers 409 for one from NW_HEALTH_TARGETS). */
+  addMonitor: (input: NewMonitor): Promise<Monitor> =>
+    config.useMocks ? fromMock(() => mock.addMonitor(input)) : request('/monitors', { method: 'POST', body: json(input) }),
+  removeMonitor: (id: string): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.removeMonitor(id)) : request(`/monitors/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  pauseMonitor: (id: string, paused: boolean): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.pauseMonitor(id, paused)) : request(`/monitors/${encodeURIComponent(id)}/paused`, { method: 'PUT', body: json({ paused }) }),
 
   /** "Test now": runs one health check right away (404 for a service that is not monitored). */
   checkService: (id: string): Promise<ServiceCheckResult> =>

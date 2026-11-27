@@ -21,7 +21,7 @@ _(no active branch)_
 - [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
 - [ ] Rule evaluation: let heartbeat rules own "service down" instead of the health checker's fixed failure count (#—)
 - [ ] FinVault rps / error % per service (no `/metrics` in FinVault) (#—)
-- [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
+- [ ] Make unmeasured numbers nullable in the contract: `restarts24h`, `NodeSummary.containers` (#—)
 - [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
 - [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
 - [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
@@ -40,7 +40,7 @@ _(no active branch)_
 
 ### Dashboard
 - [ ] Login: more than one user / roles (today one shared password) (#—)
-- [ ] Wire the "Coming soon" actions: add monitor, test check, rotate agent token (#—)
+- [ ] Edit a monitor added from the dashboard (today: remove and add again) (#—)
 - [ ] Alerting follow-ups: Overview's open-alert KPI is still hard-coded in the mock; Service detail's "Escalation" setting is static text — read both from `/alerts` (#—)
 - [ ] Alerting follow-ups: a rule has no per-service/queue scope yet (it covers every target of its project); add label filters like `service="…"` (#—)
 - [ ] Alerting follow-ups: the escalation display infers "sent" from elapsed time; once the collector delivers notifications, return the real delivery log per alert (#—)
@@ -65,6 +65,7 @@ _(no active branch)_
 
 ## Done
 ### `feature/polish` — merged into `dev`
+- [x] Monitors from the dashboard: add on Heartbeats, pause / resume / remove on Service detail; same host rules as channels (#—)
 - [x] Optional login (`NW_DASHBOARD_PASSWORD`): session cookie, rate-limited, `/status` public; Settings warns without it (#—)
 - [x] CI on every push to dev/staging/main and every PR: build, lint, test, both images (#—)
 - [x] `npm run dev` starts without a root `.env`; `/health` reports the package version (#—)

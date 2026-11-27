@@ -317,6 +317,20 @@ describe('HTTP contract — live specifics', () => {
     expect((await api.get<C.SettingsData>('/api/settings')).agentSource).toBe('nexusinfra');
   });
 
+  it('adds, pauses and removes a monitor over HTTP, and refuses bad ones', async () => {
+    const send = (method: string, path: string, body?: unknown) =>
+      fetch(`${api.base}/api${path}`, { method, headers: { 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    expect((await send('POST', '/monitors', { name: 'x', project: 'finvault', url: 'http://127.0.0.1/' })).status).toBe(422);
+    const created = await send('POST', '/monitors', { name: 'Extra gateway', project: 'finvault', url: 'http://extra-gateway:8000/health' });
+    expect(created.status).toBe(200);
+    expect(await created.json()).toMatchObject({ serviceId: 'm-extra-gateway', source: 'dashboard', paused: false });
+    expect((await send('PUT', '/monitors/m-extra-gateway/paused', { paused: true })).status).toBe(204);
+    expect((await api.get<C.HeartbeatsData>('/api/heartbeats')).monitors.find((m) => m.serviceId === 'm-extra-gateway')?.paused).toBe(true);
+    expect((await send('DELETE', '/monitors/fv-api-gateway')).status).toBe(409);
+    expect((await send('DELETE', '/monitors/m-extra-gateway')).status).toBe(204);
+    expect((await api.get<C.HeartbeatsData>('/api/heartbeats')).monitors.some((m) => m.serviceId === 'm-extra-gateway')).toBe(false);
+  });
+
   it('serves no sample data anywhere once a source is configured', async () => {
     // Names that only exist in the dashboard's sample data.
     const SAMPLE_ONLY = ['game-valheim-02', 'web-mc-04', 'node-02', 'home.example', 'acc_29e', 'tu_8', 'w_3f9a', 'inc_4', 'mnt-finvault-db'];

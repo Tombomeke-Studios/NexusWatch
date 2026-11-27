@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AddMonitorDialog } from './heartbeats/AddMonitor';
 import { useHeartbeats } from '@/api/queries';
 import { NodeCard } from '@/components/NodeCard';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -14,13 +16,15 @@ const uptimeColor = { up: 'var(--ok)', slow: 'var(--warn)', down: 'var(--down)' 
 
 export function HeartbeatsPage() {
   const query = useHeartbeats();
+  const [adding, setAdding] = useState(false);
   return (
     <>
       <PageHeader title="Heartbeats" subtitle={<>Uptime of every service and node, last 60 days{config.useMocks && ' · sample data'}</>}>
-        <button type="button" className="btn pri" disabled title="Monitors are the collector's NW_HEALTH_TARGETS">
+        <button type="button" className="btn pri" onClick={() => setAdding(true)}>
           + Add monitor
         </button>
       </PageHeader>
+      {adding && <AddMonitorDialog onClose={() => setAdding(false)} />}
 
       <QueryState query={query} skeletonHeight={1000}>
         {(data) => (
@@ -53,12 +57,13 @@ export function HeartbeatsPage() {
                       <Swatch color={projectColor[m.project]} />
                       <span style={{ fontWeight: 600 }}>{m.name}</span>
                       <span className="mono subtle" style={{ fontSize: 12 }}>{m.target}</span>
+                      {m.paused && <Pill tone="p-mute">paused</Pill>}
                       <span className="num" style={{ marginLeft: 'auto', fontSize: 20, color: uptimeColor[m.status] }}>{formatPercent(m.uptimePct)}</span>
                     </div>
                     <StatusStrip statuses={m.days} height={30} />
                     <div className="mono subtle" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                       <span>60 days ago</span>
-                      <span>avg {formatLatency(m.avgLatencyMs)} · now {formatLatency(m.nowLatencyMs)}</span>
+                      <span>avg {m.avgLatencyMs === null ? 'no answer' : formatLatency(m.avgLatencyMs)} · now {formatLatency(m.nowLatencyMs)}</span>
                       <span>today</span>
                     </div>
                   </Link>

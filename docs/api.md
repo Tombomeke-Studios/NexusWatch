@@ -57,6 +57,9 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 | `PUT /settings/channels/:id` | `ChannelConfig` (the fields `CHANNEL_FIELDS` lists for that channel) | Sets up a channel and switches it on. **Write-only**: the body is validated with `validateChannelConfig` (Discord only at discord.com, Telegram by token + chat id, ntfy/SMTP never at a loopback, link-local or metadata address), stored, and never returned — `Channel.target` stays masked. 204; 422 for a field that does not validate; 409 when the collector's `NW_*` variable sets that channel (it wins); 404 for an unknown channel |
 | `DELETE /settings/channels/:id` | | Forgets a channel set up in Settings → 204 (409 when set by `NW_*`) |
 | `POST /settings/channels/:id/test` | | Sends one test message through that channel → `ChannelTestResult` (404 for an unknown channel) |
+| `POST /monitors` | `NewMonitor` | Adds a monitor (checked from now on, stored on the collector) → its `Monitor`. 422 when a field does not validate (`validateMonitor`: http(s) only, no loopback / link-local / metadata host, interval 15/30/60/120/300 s) |
+| `DELETE /monitors/:id` | | Removes a monitor added here → 204; 409 for one from `NW_HEALTH_TARGETS`. Its history stays until retention |
+| `PUT /monitors/:id/paused` | `{ paused }` | Pauses or resumes any monitor → 204. A paused monitor is not checked and opens no incident |
 | `POST /services/:id/check` | | "Test now": one health check right away, stored with the others → `ServiceCheckResult` (404 when the service is not monitored) |
 
 A write the backend refuses because the input is invalid answers **422** with a one-line reason as
@@ -181,9 +184,9 @@ Rules the live answers follow, beyond the shapes:
   all. An empty bucket after the first measurement repeats the previous value.
 - **Unknown is `null`** where the contract allows it: a failed check's latency, `FinVaultService.rps`
   and `errorPct` while no request-rate source covers FinVault, and the business fields above.
-- A few fields are not nullable yet and read `0` while unmeasured: `Monitor.avgLatencyMs`,
-  `ServiceDetail.kpis.avgLatencyMs` / `p95LatencyMs` (no answered check in 24h), `restarts24h` and
-  `NodeSummary.containers` (need the agent). TODO.md tracks making them nullable.
+- `Monitor.avgLatencyMs` and `ServiceDetail.kpis.avgLatencyMs` / `p95LatencyMs` are `null` when no check
+  answered in 24 h. Still `0` while unmeasured: `restarts24h` and `NodeSummary.containers` (need the agent);
+  TODO.md tracks making them nullable.
 - Incidents are opened by the collector itself (N failed checks in a row, or a heartbeat source going
   offline) and every open incident is an active alert. Alert *rules* are not evaluated yet; their
   list and toggles are stored but the rules themselves are the sample set.

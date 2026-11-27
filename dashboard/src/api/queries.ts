@@ -5,7 +5,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { config } from '@/lib/config';
 import { api } from './endpoints';
-import type { ChannelConfig, ChannelId, LogQuery, MetricId, SettingsData, TimeRange } from './types';
+import type { NewMonitor, ChannelConfig, ChannelId, LogQuery, MetricId, SettingsData, TimeRange } from './types';
 import type { NewIncident, NewIncidentUpdate, ResolveIncident } from './types';
 import type { AlertRuleInput, EscalationPolicyInput, MaintenanceInput, SilenceInput } from './types';
 
@@ -83,6 +83,15 @@ export function useUpdateSettings() {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
 }
+
+/** Add, remove or pause a monitor: everything that lists services changes, so refetch it all. */
+export function useMonitorMutation<T, R>(fn: (arg: T) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries() });
+}
+export const useAddMonitor = () => useMonitorMutation((input: NewMonitor) => api.addMonitor(input));
+export const useRemoveMonitor = () => useMonitorMutation((id: string) => api.removeMonitor(id));
+export const usePauseMonitor = () => useMonitorMutation(({ id, paused }: { id: string; paused: boolean }) => api.pauseMonitor(id, paused));
 
 /** Login state; refetched whenever any request answers 401 (see `main.tsx`). */
 export const useAuth = () => useQuery({ queryKey: ['auth'], queryFn: api.auth, staleTime: Infinity, retry: false });

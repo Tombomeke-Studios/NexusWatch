@@ -19,6 +19,8 @@ export interface HealthTarget {
   port: string;
   intervalMs: number;
   timeoutMs: number;
+  /** Absent = from NW_HEALTH_TARGETS; `dashboard` = added on Heartbeats (stored in SQLite). */
+  source?: 'dashboard';
 }
 
 export interface MetricsTarget {
@@ -32,7 +34,8 @@ export interface Config {
   dbPath: string;
   /** `explicit` = NW_HOST_NAME was set; otherwise the Docker host's name is preferred when known. */
   host: { name: string; address: string | null; explicit: boolean };
-  health: { targets: HealthTarget[]; slowMs: number; failuresForIncident: number };
+  /** `timeoutMs`: NW_HEALTH_TIMEOUT_MS, also for monitors added from the dashboard. */
+  health: { targets: HealthTarget[]; slowMs: number; failuresForIncident: number; timeoutMs: number };
   controlRoom: { url: string; intervalMs: number; nodePattern: RegExp } | null;
   metrics: { targets: MetricsTarget[]; intervalMs: number; token: string | undefined };
   bus: { url: string; queue: string } | null;
@@ -179,6 +182,7 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
       targets,
       slowMs: num(env, 'NW_HEALTH_SLOW_MS', 100),
       failuresForIncident: Math.max(1, num(env, 'NW_HEALTH_FAILURES_FOR_INCIDENT', 3)),
+      timeoutMs,
     },
     controlRoom: env.NW_CONTROL_ROOM_URL
       ? {

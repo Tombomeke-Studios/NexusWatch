@@ -197,6 +197,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
 | `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
 | `lib/channels.ts` | Notification channel setup: `CHANNEL_FIELDS` (the form), `validateChannelConfig` (shared by form, mock and collector), `isBlockedHost`, `maskChannelTarget` |
+| `lib/monitors.ts` | `validateMonitor` (form, mock and collector; same host rules as channels), `monitorId`, `MONITOR_INTERVALS` |
+| `pages/heartbeats/AddMonitor.tsx` | The "+ Add monitor" dialog on Heartbeats |
 | `pages/settings/ChannelSetup.tsx` | The write-only "Set up / Change" dialog for a notification channel |
 | `lib/rules.ts` | Pure alerting logic: `METRICS`, parse/format/validate rule conditions and durations, `evaluateReading`/`evaluateRule`, rule drafts (editor state), silences, maintenance windows, `escalationProgress`, `filterHistory` |
 | `lib/useNow.ts` | `useNow(ms)` — ticking clock for countdowns |
@@ -224,6 +226,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `contract.ts` · `sample.ts` | Re-export the dashboard's `api/types.ts` and `api/mock/data.ts` (never copied) |
 | `routes.ts` | **Every endpoint, one table** (`/health` + docs/api.md); add an endpoint here |
 | `server.ts` | Express app: routes under `/api` (behind the login middleware), `/api/auth/*`, `/health` at the root, `HttpError` → status + text |
+| `monitors.ts` | Monitors added from the dashboard (SQLite) joining `config.health.targets`; pause set; `addMonitor` / `removeMonitor` / `pauseMonitor`; `ctx.monitors` (wired in `index.ts`) schedules them |
 | `auth.ts` | Optional login (`NW_DASHBOARD_PASSWORD`): hashed sessions in SQLite, HttpOnly cookie, 5 wrong tries/min per address, `isPublic` paths |
 | `store.ts` | SQLite (`node:sqlite`): logs, checks, samples, heartbeat sources, incidents, key/value, business events (never pruned); `prune`, `usage` |
 | `duration.ts` | `parseDuration('14d')`, time ranges |
@@ -296,6 +299,9 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   never returned: `Channel.target` is masked, `PATCH /settings` keeps nothing of a channel but `enabled`.
   Any other endpoint that takes a URL for the collector to call needs the same host checks. Send every
   channel error through `send()`, which scrubs secrets.
+- **`config.health.targets` is the one monitor list and changes at runtime** (monitors added from the dashboard
+  are pushed into it). Read it each time; never copy it at start. A monitor's `source` is absent for
+  `NW_HEALTH_TARGETS` and `dashboard` for added ones; only those can be removed.
 - **A new public endpoint goes in `isPublic` (`auth.ts`)** — everything else needs a session once a password is
   set. `/status` must stay public; never make a write public.
 - **Route handlers may be async** (`server.ts` awaits them); a rejected promise reaches the error handler.
