@@ -73,6 +73,10 @@ _(no active branch)_
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `feature/notification-setup` — merged into `dev`
+- [x] Set up Discord, Telegram, ntfy and email in Settings: write-only, validated (fixed hosts, no local/metadata addresses), `NW_*` wins (#—)
+- [x] "Test now" on Service detail runs a real health check; Overview shows the real check interval (#—)
+- [x] Settings → Agents shows NexusInfra's node agents in live mode, without the fictional token / install snippet (#—)
 ### `feature/release` — merged into `dev`
 - [x] Docker Engine source: top consumers, NexusInfra containers, memory / disk IO / network, host name (#—)
 - [x] Live SLOs, incidents and `/status`; no sample data anywhere once a source is set (#—)
