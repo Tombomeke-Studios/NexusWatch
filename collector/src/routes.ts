@@ -3,6 +3,7 @@
  * returns the type from contract.ts (falling back to the dashboard's sample generator while no
  * source feeds it). Paths are relative to `/api`.
  */
+import { readFileSync } from 'node:fs';
 import { configureChannel, removeChannel } from './notify/targets.js';
 import type { CollectorHealth, LogLevel, MetricId, ProjectId } from './contract.js';
 import { isRange, type Range } from './duration.js';
@@ -40,7 +41,8 @@ export interface Route {
   handle: RouteHandler;
 }
 
-const VERSION = '0.1.0';
+/** The collector's own version, from its package.json (bumped per release). */
+const VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
 const METRIC_IDS: MetricId[] = ['cpu', 'memory', 'disk', 'network', 'queues'];
 const LEVELS: LogLevel[] = ['error', 'warn', 'info', 'ok'];
 const PROJECTS: ProjectId[] = ['nexusinfra', 'finvault'];
