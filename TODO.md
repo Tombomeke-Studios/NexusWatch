@@ -49,7 +49,6 @@ _(no active branch)_
 - [ ] Offline banner when the service worker serves the cached shell and `/api` is unreachable (#—)
 - [ ] Web push for alerts on the installed PWA (needs the backend's notification delivery) (#—)
 - [ ] Accessibility pass with axe in both themes (#—)
-- [ ] Code-split pages (bundle is 444 kB before gzip) (#—)
 - [ ] Business: click a top-up to see its events on the bus and the bridge's log lines (`routes.logsFor(reference)`) once the collector indexes references (#—)
 - [ ] Business: raise reconciliation anomalies as alerts (rules on `confirmed-not-credited`, `credited-twice`, DLQ depth > 0) (#—)
 - [ ] Business: time range for the top-up window (7 days is fixed in the contract today) (#—)
@@ -64,6 +63,7 @@ _(no active branch)_
 
 ## Done
 ### `feature/polish` — merged into `dev`
+- [x] Pages load lazily (main bundle 596 → 346 kB); all pages swept at 390 / 1440 px in a production build (#—)
 - [x] Live alerts: acknowledge and resolve keep time and note; mute one alert; "until resolved" silences end with the alert (#—)
 - [x] Monitors from the dashboard: add on Heartbeats, pause / resume / remove on Service detail; same host rules as channels (#—)
 - [x] Optional login (`NW_DASHBOARD_PASSWORD`): session cookie, rate-limited, `/status` public; Settings warns without it (#—)

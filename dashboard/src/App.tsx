@@ -2,20 +2,12 @@ import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-rou
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthGate } from '@/components/layout/AuthGate';
 import { OverviewPage } from '@/pages/Overview';
-import { MetricsPage } from '@/pages/Metrics';
-import { LogsPage } from '@/pages/Logs';
-import { HeartbeatsPage } from '@/pages/Heartbeats';
-import { AlertsPage } from '@/pages/Alerts';
-import { ServiceDetailPage } from '@/pages/ServiceDetail';
-import { NexusInfraPage } from '@/pages/projects/NexusInfra';
-import { FinVaultPage } from '@/pages/projects/FinVault';
-import { SettingsPage } from '@/pages/Settings';
-import { BusinessPage } from '@/pages/Business';
-import { NotFoundPage } from '@/pages/NotFound';
-import { SloPage } from '@/pages/Slo';
-import { IncidentsPage } from '@/pages/Incidents';
-import { IncidentDetailPage } from '@/pages/IncidentDetail';
-import { StatusPage } from '@/pages/StatusPage';
+
+/**
+ * Every page but Overview loads when it is first opened (its own chunk), so the first paint on a
+ * phone does not wait for the whole app.
+ */
+const page = <M,>(load: () => Promise<M>, pick: (m: M) => React.ComponentType) => async () => ({ Component: pick(await load()) });
 
 /** Route table. Paths mirror `routes.ts`. */
 export const routeTable: RouteObject[] = [
@@ -27,23 +19,23 @@ export const routeTable: RouteObject[] = [
     ),
     children: [
       { index: true, element: <OverviewPage /> },
-      { path: 'heartbeats', element: <HeartbeatsPage /> },
-      { path: 'logs', element: <LogsPage /> },
-      { path: 'metrics', element: <MetricsPage /> },
-      { path: 'alerts', element: <AlertsPage /> },
-      { path: 'services/:serviceId', element: <ServiceDetailPage /> },
-      { path: 'projects/nexusinfra', element: <NexusInfraPage /> },
-      { path: 'projects/finvault', element: <FinVaultPage /> },
-      { path: 'settings', element: <SettingsPage /> },
-      { path: 'slo', element: <SloPage /> },
-      { path: 'incidents', element: <IncidentsPage /> },
-      { path: 'incidents/:incidentId', element: <IncidentDetailPage /> },
-      { path: 'business', element: <BusinessPage /> },
-      { path: '*', element: <NotFoundPage /> },
+      { path: 'heartbeats', lazy: page(() => import('@/pages/Heartbeats'), (m) => m.HeartbeatsPage) },
+      { path: 'logs', lazy: page(() => import('@/pages/Logs'), (m) => m.LogsPage) },
+      { path: 'metrics', lazy: page(() => import('@/pages/Metrics'), (m) => m.MetricsPage) },
+      { path: 'alerts', lazy: page(() => import('@/pages/Alerts'), (m) => m.AlertsPage) },
+      { path: 'services/:serviceId', lazy: page(() => import('@/pages/ServiceDetail'), (m) => m.ServiceDetailPage) },
+      { path: 'projects/nexusinfra', lazy: page(() => import('@/pages/projects/NexusInfra'), (m) => m.NexusInfraPage) },
+      { path: 'projects/finvault', lazy: page(() => import('@/pages/projects/FinVault'), (m) => m.FinVaultPage) },
+      { path: 'settings', lazy: page(() => import('@/pages/Settings'), (m) => m.SettingsPage) },
+      { path: 'slo', lazy: page(() => import('@/pages/Slo'), (m) => m.SloPage) },
+      { path: 'incidents', lazy: page(() => import('@/pages/Incidents'), (m) => m.IncidentsPage) },
+      { path: 'incidents/:incidentId', lazy: page(() => import('@/pages/IncidentDetail'), (m) => m.IncidentDetailPage) },
+      { path: 'business', lazy: page(() => import('@/pages/Business'), (m) => m.BusinessPage) },
+      { path: '*', lazy: page(() => import('@/pages/NotFound'), (m) => m.NotFoundPage) },
     ],
   },
   // Public and shareable: no sidebar, no internal navigation.
-  { path: 'status', element: <StatusPage /> },
+  { path: 'status', lazy: page(() => import('@/pages/StatusPage'), (m) => m.StatusPage) },
 ];
 
 const router = createBrowserRouter(routeTable);

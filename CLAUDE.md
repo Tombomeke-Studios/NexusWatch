@@ -170,7 +170,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 ### dashboard/src
 | Path | Contents |
 |---|---|
-| `main.tsx` · `App.tsx` | Providers (React Query, theme) + the route table (`routeTable`, exported for tests) |
+| `main.tsx` · `App.tsx` | Providers (React Query, theme, 401 → re-ask auth) + the route table (`routeTable`, exported for tests). Every page but Overview is a lazy route (own chunk); tests that check the location after navigating must `waitFor` it |
 | `pwa.ts` | `registerServiceWorker()` — production builds only |
 | `routes.ts` | **Every URL in the app.** Build links from here, never from string literals. `logsFor(q, entryId)` deep-links into Logs: unfiltered search on `q`, that line selected |
 | `theme.tsx` | `ThemeProvider`/`useTheme` — dark (default) / light / system, stored in localStorage, sets `data-theme` on `<html>`; pure `resolveTheme` |
