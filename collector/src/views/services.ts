@@ -1,7 +1,7 @@
 /** Services, monitors and the service detail page — from health checks when targets are configured. */
 import type { HealthTarget } from '../config.js';
-import type { HealthStatus, Monitor, ServiceDetail, ServiceSummary } from '../contract.js';
-import { trailingFailures } from '../sources/health.js';
+import type { HealthStatus, Monitor, ServiceCheckResult, ServiceDetail, ServiceSummary } from '../contract.js';
+import { runHealthCheck, trailingFailures } from '../sources/health.js';
 import type { Check } from '../store.js';
 import { DAY_MS, iso, seconds, type Ctx } from './ctx.js';
 import { percentile, round } from './series.js';
@@ -101,6 +101,21 @@ export function monitors(ctx: Ctx): Monitor[] {
       days: dailyStatus(ctx.store.checks(t.id, now - DAYS * DAY_MS), now),
     };
   });
+}
+
+/** "Test now": one health check of a monitored service, right away, stored like any other. */
+export async function checkService(ctx: Ctx, id: string): Promise<ServiceCheckResult | null> {
+  if (!ctx.live.logs) {
+    try {
+      return ctx.sample.checkService(id);
+    } catch {
+      return null;
+    }
+  }
+  const target = ctx.config.health.targets.find((t) => t.id === id);
+  if (!target) return null;
+  const check = await runHealthCheck(target, ctx.store, ctx.notify.fetch, ctx.clock, { slowMs: ctx.config.health.slowMs, failuresForIncident: ctx.config.health.failuresForIncident });
+  return { at: iso(check.ts), status: check.status, latencyMs: check.latencyMs, note: check.note };
 }
 
 export function serviceDetail(ctx: Ctx, id: string): ServiceDetail | null {

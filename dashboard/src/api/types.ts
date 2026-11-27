@@ -150,6 +150,8 @@ export interface OverviewData {
   requests: { rps: number[]; errors5xx: number[] };
   topupsPerHour: number[];
   paymentsPerDay: number[];
+  /** How often the health checks run (the shortest interval); null when nothing is checked. */
+  checkIntervalSeconds: number | null;
 }
 
 // ── Metrics ────────────────────────────────────────────────────────────
@@ -445,9 +447,31 @@ export interface Channel {
   description: string;
   /** Where it sends to, masked: the real target is a secret that lives in the backend's configuration. */
   target: string;
-  /** False while the backend has no target for it; then `target` says what to set. */
+  /** False while the backend has no target for it; then `target` says how to set one up. */
   configured: boolean;
+  /**
+   * Where the target comes from: `env` (the collector's NW_* variables — they win and cannot be changed
+   * here), `settings` (entered on the Settings page), null while not set up.
+   */
+  source: ChannelSource | null;
   enabled: boolean;
+}
+
+export type ChannelSource = 'env' | 'settings';
+
+/**
+ * Body of `PUT /settings/channels/:id`: the fields `CHANNEL_FIELDS` (lib/channels.ts) lists for that
+ * channel. Write-only — the API never returns it, only the masked `Channel.target`.
+ */
+export type ChannelConfig = Record<string, string>;
+
+/** Answer of `POST /services/:id/check` ("Test now"): one health check, run right away and stored. */
+export interface ServiceCheckResult {
+  at: string;
+  status: HealthStatus;
+  /** null = no answer. */
+  latencyMs: number | null;
+  note: string;
 }
 
 /** Answer of `POST /settings/channels/:id/test`. A failed delivery is a result, not an HTTP error. */
@@ -458,6 +482,11 @@ export interface ChannelTestResult {
 }
 
 export interface SettingsData {
+  /**
+   * Who the agents are: `nexuswatch` = NexusWatch's own agent (tokens, install snippet); `nexusinfra` =
+   * NexusInfra's node agents heard on the bus — nothing to install or rotate here.
+   */
+  agentSource: 'nexuswatch' | 'nexusinfra';
   agents: Agent[];
   serverUrl: string;
   channels: Channel[];

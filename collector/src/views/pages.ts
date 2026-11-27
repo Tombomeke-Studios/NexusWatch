@@ -87,6 +87,9 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
     requests,
     topupsPerHour: money ? money.topupsPerHour : base.topupsPerHour,
     paymentsPerDay: money ? money.paymentsPerDay : base.paymentsPerDay,
+    checkIntervalSeconds: !real
+      ? base.checkIntervalSeconds
+      : ctx.config.health.targets.length ? Math.round(Math.min(...ctx.config.health.targets.map((t) => t.intervalMs)) / 1000) : null,
   };
 }
 

@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useService } from '@/api/queries';
+import { useCheckService, useService } from '@/api/queries';
 import type { LogEntry, ServiceDetail } from '@/api/types';
 import { LogDocument } from '@/components/LogDocument';
 import { SloCard } from '@/components/SloCard';
@@ -55,6 +55,7 @@ function ExpandableLogs({ entries }: { entries: LogEntry[] }) {
 
 function ServiceBody({ data }: { data: ServiceDetail }) {
   const { service, kpis } = data;
+  const check = useCheckService(service.id);
   const down = service.status === 'down';
   const answered = data.responseTimes.filter((v): v is number => v !== null);
   const span = answered.length / data.responseTimes.length;
@@ -80,9 +81,14 @@ function ServiceBody({ data }: { data: ServiceDetail }) {
           </>
         }
       >
-        <button type="button" className="btn" disabled title="Coming soon">Test now</button>
-        <button type="button" className="btn" disabled title="Coming soon">Pause monitor</button>
-        <button type="button" className="btn danger" disabled title="Coming soon">Restart container</button>
+        {check.data && !check.isPending && (
+          <span role="status" className="mono small" style={{ alignSelf: 'center', color: check.data.status === 'down' ? 'var(--down)' : 'var(--ok)' }}>
+            {check.data.status === 'down' ? `down — ${check.data.note}` : `${check.data.status} · ${check.data.latencyMs} ms`}
+          </span>
+        )}
+        {check.isError && <span role="status" className="small" style={{ alignSelf: 'center', color: 'var(--down)' }}>could not run the check</span>}
+        <button type="button" className="btn" disabled={check.isPending} onClick={() => check.mutate()}>{check.isPending ? 'Checking…' : 'Test now'}</button>
+        <button type="button" className="btn danger" disabled title="NexusWatch only observes: restart it in NexusInfra">Restart container</button>
       </PageHeader>
 
       {down && data.downSince && (

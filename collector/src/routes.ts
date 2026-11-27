@@ -3,6 +3,7 @@
  * returns the type from contract.ts (falling back to the dashboard's sample generator while no
  * source feeds it). Paths are relative to `/api`.
  */
+import { configureChannel, removeChannel } from './notify/targets.js';
 import type { CollectorHealth, LogLevel, MetricId, ProjectId } from './contract.js';
 import { isRange, type Range } from './duration.js';
 import { testChannel } from './notify/dispatch.js';
@@ -11,7 +12,7 @@ import type { Ctx } from './views/ctx.js';
 import { logs } from './views/logs.js';
 import { metric, metricsOverview } from './views/metrics.js';
 import { finVault, heartbeats, host, navCounts, nexusInfra, overview } from './views/pages.js';
-import { serviceDetail } from './views/services.js';
+import { checkService, serviceDetail } from './views/services.js';
 import { sampledRoutes } from './views/sampled.js';
 import { settings, updateSettings, type SettingsPatch } from './views/settings.js';
 
@@ -112,6 +113,11 @@ export const routes: Route[] = [
     path: '/services/:id',
     handle: (ctx, { params }) => serviceDetail(ctx, params.id) ?? (() => { throw new HttpError(404, `Service ${params.id} not found`); })(),
   },
+  {
+    method: 'POST',
+    path: '/services/:id/check',
+    handle: async (ctx, { params }) => (await checkService(ctx, params.id)) ?? (() => { throw new HttpError(404, `Service ${params.id} is not monitored`); })(),
+  },
   { method: 'GET', path: '/projects/nexusinfra', handle: (ctx) => nexusInfra(ctx) },
   { method: 'GET', path: '/projects/finvault', handle: (ctx) => finVault(ctx) },
   { method: 'GET', path: '/settings', handle: (ctx) => settings(ctx) },
@@ -128,6 +134,9 @@ export const routes: Route[] = [
       return null;
     },
   },
+  // Write-only: the body is validated and stored, never returned (Channel.target is masked).
+  { method: 'PUT', path: '/settings/channels/:id', handle: (ctx, { params, body }) => (configureChannel(ctx, params.id, body), null) },
+  { method: 'DELETE', path: '/settings/channels/:id', handle: (ctx, { params }) => (removeChannel(ctx, params.id), null) },
   {
     method: 'POST',
     path: '/settings/channels/:id/test',

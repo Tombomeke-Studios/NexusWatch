@@ -38,6 +38,8 @@ const ctx = createCtx(store, config, {
   clock,
   tasks: () => scheduler.snapshot(),
   mail: email ? createMailer(email.smtpUrl, config.notify.timeoutMs) : null,
+  // For an SMTP server set up in Settings instead of NW_SMTP_URL.
+  mailer: (smtpUrl) => createMailer(smtpUrl, config.notify.timeoutMs),
 });
 // Rules and notifications only make sense for real measurements, so both exist only with a live source.
 if (ctx.live.logs) tasks.push(rulesTask(ctx), notifyTask(ctx));

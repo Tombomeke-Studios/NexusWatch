@@ -5,7 +5,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { config } from '@/lib/config';
 import { api } from './endpoints';
-import type { ChannelId, LogQuery, MetricId, SettingsData, TimeRange } from './types';
+import type { ChannelConfig, ChannelId, LogQuery, MetricId, SettingsData, TimeRange } from './types';
 import type { NewIncident, NewIncidentUpdate, ResolveIncident } from './types';
 import type { AlertRuleInput, EscalationPolicyInput, MaintenanceInput, SilenceInput } from './types';
 
@@ -82,6 +82,29 @@ export function useUpdateSettings() {
     mutationFn: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>) => api.updateSettings(patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
+}
+
+/** "Test now" on a service: the new check lands in its history, so the page refreshes. */
+export function useCheckService(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.checkService(id),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: keys.service(id) }), qc.invalidateQueries({ queryKey: ['overview'] })]),
+  });
+}
+
+/** Set up or remove a notification channel; both change Settings. */
+export function useConfigureChannel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: ChannelId; body: ChannelConfig }) => api.configureChannel(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
+  });
+}
+
+export function useRemoveChannel() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: ChannelId) => api.removeChannel(id), onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }) });
 }
 
 /** "Send test" on a notification channel. Changes nothing, so it invalidates nothing. */

@@ -7,6 +7,7 @@
  *
  * Only real incidents are notified: with no live source the alerts are sample data.
  */
+import { effectiveTargets } from './targets.js';
 import type { ChannelId, ChannelTestResult } from '../contract.js';
 import type { Task } from '../sources/types.js';
 import type { IncidentRow } from '../store.js';
@@ -51,7 +52,7 @@ async function deliver(ctx: Ctx, i: IncidentRow, kind: 'firing' | 'resolved', ch
   const m = message(ctx, i, kind);
   await Promise.all(
     owed.map(async (channel) => {
-      const result = await send(channel, ctx.config.notify.targets, m, ctx.notify);
+      const result = await send(channel, effectiveTargets(ctx), m, ctx.notify);
       if (result.ok) progress.sent.push(channel);
       const last = progress.attempts >= MAX_ATTEMPTS;
       // One line per delivery, and per failure only on the first and the last attempt.
@@ -117,7 +118,7 @@ export async function testChannel(ctx: Ctx, id: string): Promise<ChannelTestResu
   if (!CHANNEL_IDS.includes(id as ChannelId)) return null;
   const result = await send(
     id as ChannelId,
-    ctx.config.notify.targets,
+    effectiveTargets(ctx),
     {
       kind: 'test',
       severity: 'info',

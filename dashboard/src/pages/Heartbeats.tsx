@@ -17,7 +17,7 @@ export function HeartbeatsPage() {
   return (
     <>
       <PageHeader title="Heartbeats" subtitle={<>Uptime of every service and node, last 60 days{config.useMocks && ' · sample data'}</>}>
-        <button type="button" className="btn pri" disabled title="Coming soon">
+        <button type="button" className="btn pri" disabled title="Monitors are the collector's NW_HEALTH_TARGETS">
           + Add monitor
         </button>
       </PageHeader>

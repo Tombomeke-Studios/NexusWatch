@@ -59,13 +59,13 @@ export function liveFor(config: Config): Live {
   };
 }
 
-export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[]; fetch?: Fetch; mail?: Mailer | null } = {}): Ctx {
+export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[]; fetch?: Fetch; mail?: Mailer | null; mailer?: (smtpUrl: string) => Mailer } = {}): Ctx {
   const clock = opts.clock ?? Date.now;
   // Alerting and incident writes from an earlier run (views/persist.ts).
   restoreState(store, Object.values(liveFor(config)).some(Boolean));
   return {
     store, config, clock, sample, live: liveFor(config), tasks: opts.tasks ?? (() => []), startedAt: clock(),
-    notify: { fetch: opts.fetch ?? fetch, mail: opts.mail ?? null, timeoutMs: config.notify.timeoutMs },
+    notify: { fetch: opts.fetch ?? fetch, mail: opts.mail ?? null, ...(opts.mailer ? { mailer: opts.mailer } : {}), timeoutMs: config.notify.timeoutMs },
   };
 }
 

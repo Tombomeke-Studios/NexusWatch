@@ -49,12 +49,24 @@ describe('mock data', () => {
     expect(a.history.find((h) => h.alertId === 'al_1')?.notes).toHaveLength(1);
   });
 
-  it('marks every sample channel configured and answers a channel test without sending', () => {
+  it("says where a channel's target comes from, and answers a channel test without sending", () => {
     for (const c of mock.settings().channels) {
-      expect(c.configured).toBe(true);
+      // Configured exactly when it has a source; a target never comes back unmasked.
+      expect(c.configured).toBe(c.source !== null);
+      expect(c.target).not.toMatch(/https?:\/\//);
       expect(mock.testChannel(c.id)).toMatchObject({ ok: true });
     }
     expect(() => mock.testChannel('fax')).toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  it('sets up a channel write-only, refuses a bad field with 422, and forgets it again', () => {
+    expect(() => mock.configureChannel('telegram', { botToken: 'nope', chatId: '1' })).toThrow(expect.objectContaining({ status: 422 }));
+    mock.configureChannel('telegram', { botToken: '123456:ABCdefGHIjklMNOpqrSTUvwxYZ_12345', chatId: '-100123' });
+    const t = mock.settings().channels.find((c) => c.id === 'telegram')!;
+    expect(t).toMatchObject({ configured: true, source: 'settings', enabled: true });
+    expect(JSON.stringify(mock.settings())).not.toContain('ABCdefGHI');
+    mock.removeChannelConfig('telegram');
+    expect(mock.settings().channels.find((c) => c.id === 'telegram')).toMatchObject({ configured: false, source: null });
   });
 
   it('routes every severity to every configured channel, Telegram included', () => {

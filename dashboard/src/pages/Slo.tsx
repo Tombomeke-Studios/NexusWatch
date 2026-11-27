@@ -29,7 +29,7 @@ export function SloPage() {
   return (
     <>
       <PageHeader title="SLOs" subtitle={<>Availability objectives and error budgets per service, rolling window{config.useMocks && ' · sample data'}</>}>
-        <button type="button" className="btn pri" disabled title="Coming soon">+ New SLO</button>
+        <button type="button" className="btn pri" disabled title="Every monitored service has one; the target is the collector's NW_SLO_TARGET">+ New SLO</button>
       </PageHeader>
       <QueryState query={query} skeletonHeight={900}>
         {(data) => <SloBody slos={data.slos} />}

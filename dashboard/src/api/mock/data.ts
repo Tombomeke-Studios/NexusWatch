@@ -7,12 +7,13 @@ import {
   draftFromRule, evaluateRule, silenceEndsAt, validateDraft, validatePolicy, validateReason, validateWindow, windowCovers,
   type Reading,
 } from '@/lib/rules';
+import { maskChannelTarget, validateChannelConfig } from '@/lib/channels';
 import { ApiError } from '../client';
 import type {
   ActiveAlert, Agent, AlertHistoryItem, AlertRule, AlertsData, Channel, ContainerRow, ContainerUsage,
   FinVaultData, HealthStatus, HeartbeatsData, HostInfo, LogEntry, LogLevel, LogQuery, LogsData,
   MetricData, MetricId, MetricsOverview, Monitor, NavCounts, NexusInfraData, NodeSummary, OverviewData,
-  ProjectId, ServiceDetail, ServiceSummary, SettingsData,
+  ProjectId, ServiceCheckResult, ServiceDetail, ServiceSummary, SettingsData,
 } from '../types';
 import { incidentSummaries } from './reliability';
 import type { AccountStanding, BusinessData, ChannelTestResult, PlanRevenue, TopUpRecord } from '../types';
@@ -173,7 +174,16 @@ export function overview(): OverviewData {
     requests: { rps: walk(41, 60, 48, 18), errors5xx: walk(42, 60, 4, 3) },
     topupsPerHour: walk(51, 24, 45, 40),
     paymentsPerDay: walk(52, 30, 40, 35),
+    checkIntervalSeconds: 30,
   };
+}
+
+/** "Test now" on a sample service: its current state, as a fresh check. */
+export function checkService(id: string): ServiceCheckResult {
+  const s = byId(id);
+  if (!s) throw new ApiError(404, `Service ${id} not found`);
+  const latencyMs = s.status === 'down' ? null : s.latencyMs;
+  return { at: new Date().toISOString(), status: s.status, latencyMs, note: s.status === 'down' ? 'connect ECONNREFUSED' : 'HTTP 200' };
 }
 
 // ── Metrics ────────────────────────────────────────────────────────────
@@ -722,10 +732,10 @@ const agents: Agent[] = [
 ];
 
 const channels: Channel[] = [
-  { id: 'discord', name: 'Discord', description: 'Webhook to your own server', target: 'https://discord.com/api/webhooks/[ID]/[TOKEN]', configured: true, enabled: true },
-  { id: 'telegram', name: 'Telegram', description: 'Bot message to a chat, group or channel', target: 'https://api.telegram.org/bot[BOT-TOKEN]/sendMessage?chat_id=[CHAT-ID]', configured: true, enabled: false },
-  { id: 'email', name: 'Email', description: 'SMTP through your home server', target: 'you@example.com', configured: true, enabled: true },
-  { id: 'push', name: 'Push (ntfy)', description: 'Instant notification on your phone', target: 'https://ntfy.sh/[YOUR-TOPIC]', configured: true, enabled: true },
+  { id: 'discord', name: 'Discord', description: 'Webhook to your own server', target: 'discord.com/api/webhooks/••••OKEN', configured: true, source: 'settings', enabled: true },
+  { id: 'telegram', name: 'Telegram', description: 'Bot message to a chat, group or channel', target: 'Not set up yet', configured: false, source: null, enabled: false },
+  { id: 'email', name: 'Email', description: 'SMTP through your home server', target: 'you@example.com', configured: true, source: 'settings', enabled: true },
+  { id: 'push', name: 'Push (ntfy)', description: 'Instant notification on your phone', target: 'ntfy.sh/••••OPIC', configured: true, source: 'settings', enabled: true },
 ];
 
 const routing: SettingsData['routing'] = {
@@ -743,6 +753,7 @@ const retention: SettingsData['retention'] = [
 export function settings(): SettingsData {
   return {
     agents: agents.map((a) => ({ ...a })),
+    agentSource: 'nexuswatch',
     serverUrl: 'https://watch.home.example',
     channels: channels.map((c) => ({ ...c })),
     routing: structuredClone(routing),
@@ -755,6 +766,22 @@ export function settings(): SettingsData {
 export function testChannel(id: string): ChannelTestResult {
   if (!channels.some((c) => c.id === id)) throw new ApiError(404, `Channel ${id} not found`);
   return { ok: true, detail: 'Sample data — nothing was sent' };
+}
+
+/** Sets up a channel from the Settings form; 422 with the field's problem when it does not validate. */
+export function configureChannel(id: string, input: Record<string, string>): void {
+  const channel = channels.find((c) => c.id === id);
+  if (!channel) throw new ApiError(404, `Channel ${id} not found`);
+  const result = validateChannelConfig(channel.id, input ?? {});
+  if (!result.ok) throw new ApiError(422, `${result.field}: ${result.error}`);
+  Object.assign(channel, { configured: true, source: 'settings', target: maskChannelTarget(channel.id, result.target), enabled: true });
+}
+
+/** Forgets a channel set up in Settings. */
+export function removeChannelConfig(id: string): void {
+  const channel = channels.find((c) => c.id === id);
+  if (!channel) throw new ApiError(404, `Channel ${id} not found`);
+  Object.assign(channel, { configured: false, source: null, target: 'Not set up yet', enabled: false });
 }
 
 export function updateSettings(patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>): void {

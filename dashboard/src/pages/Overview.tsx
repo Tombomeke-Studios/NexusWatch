@@ -86,7 +86,7 @@ function OverviewBody({ data, filter, range }: { data: OverviewData; filter: Fil
 
       <div className="cols">
         <Card labelledBy="hb" style={{ flex: '2 1 560px', minWidth: 0 }}>
-          <CardHeader id="hb" title="Heartbeats" hint="last 48 checks · every 30 s" link={{ to: routes.heartbeats, label: 'All monitors' }} />
+          <CardHeader id="hb" title="Heartbeats" hint={`last 48 checks${data.checkIntervalSeconds ? ` · every ${data.checkIntervalSeconds} s` : ''}`} link={{ to: routes.heartbeats, label: 'All monitors' }} />
           <div style={{ display: 'flex', flexDirection: 'column', padding: '6px 8px 10px' }}>
             {services.map((s) => (
               <Link key={s.id} className="row" to={routes.service(s.id)}>

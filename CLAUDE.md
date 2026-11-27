@@ -194,6 +194,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
 | `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
+| `lib/channels.ts` | Notification channel setup: `CHANNEL_FIELDS` (the form), `validateChannelConfig` (shared by form, mock and collector), `isBlockedHost`, `maskChannelTarget` |
+| `pages/settings/ChannelSetup.tsx` | The write-only "Set up / Change" dialog for a notification channel |
 | `lib/rules.ts` | Pure alerting logic: `METRICS`, parse/format/validate rule conditions and durations, `evaluateReading`/`evaluateRule`, rule drafts (editor state), silences, maintenance windows, `escalationProgress`, `filterHistory` |
 | `lib/useNow.ts` | `useNow(ms)` — ticking clock for countdowns |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
@@ -235,6 +237,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `alerting/readings.ts` | `liveReadings`: stored checks and node samples as `Reading`s at a fixed step (unknown = `null`); `bucketsBack` |
 | `alerting/evaluate.ts` | `evaluateRules` / `rulesTask`: opens and closes `rule:<ruleId>:<target>` incidents; `testRuleLive`, `currentReading`, `parseSubject` |
 | `notify/channels.ts` | One sender per channel (Discord, Telegram, ntfy, email), `send()` that never throws, `maskTarget`, error scrubbing |
+| `notify/targets.ts` | Channel targets set up in Settings (SQLite, write-only), `effectiveTargets` (NW_* wins), `configureChannel` / `removeChannel` |
 | `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
 | `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
@@ -284,9 +287,12 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   tracker), `rule:<ruleId>:<target>` (rule evaluation). `alertTarget()` in `views/alerts.ts` is the one place that reads it.
 - **Mock functions that validate against sample data take the real list as an optional argument**
   (`createMaintenance(input, known)`), so the collector can pass the monitored services.
-- **A notification target never crosses the API.** Targets come from `NW_*` variables only; `Channel.target`
-  is masked and `PATCH /settings` keeps nothing of a channel but `enabled`. Never add an endpoint that
-  accepts a URL for the collector to call, and send every channel error through `send()`, which scrubs secrets.
+- **A notification target is write-only.** It comes from `NW_*` variables (which win) or from
+  `PUT /settings/channels/:id`, validated by `validateChannelConfig` in `lib/channels.ts` — Discord only at
+  discord.com, Telegram without any URL, ntfy/SMTP never at a loopback, link-local or metadata address. It is
+  never returned: `Channel.target` is masked, `PATCH /settings` keeps nothing of a channel but `enabled`.
+  Any other endpoint that takes a URL for the collector to call needs the same host checks. Send every
+  channel error through `send()`, which scrubs secrets.
 - **Route handlers may be async** (`server.ts` awaits them); a rejected promise reaches the error handler.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in

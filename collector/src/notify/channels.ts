@@ -1,10 +1,11 @@
 /**
- * One sender per notification channel. Where a channel sends to is collector configuration
- * (`NW_*` variables), never something the API accepts: the targets are secrets, and an endpoint
- * that takes a URL to call would let anyone who reaches the API make the collector call it.
+ * One sender per notification channel. Where a channel sends to comes from the `NW_*` variables or
+ * from Settings (`notify/targets.ts`, validated by lib/channels.ts: fixed hosts for Discord and
+ * Telegram, no local or metadata address for ntfy and SMTP), and is never returned unmasked.
  *
  * Senders throw on failure with a text that never contains the target (no URL, token or topic).
  */
+import { maskChannelTarget } from '@/lib/channels';
 import type { ChannelId, Severity } from '../contract.js';
 import { errorText, type Fetch } from '../sources/types.js';
 
@@ -29,8 +30,10 @@ export type Mailer = (mail: { from: string; to: string; subject: string; text: s
 
 export interface NotifyDeps {
   fetch: Fetch;
-  /** Null when no SMTP server is configured. */
+  /** The mailer for NW_SMTP_URL; null when that is not set. */
   mail: Mailer | null;
+  /** Builds a mailer for an SMTP server set up in Settings. */
+  mailer?: (smtpUrl: string) => Mailer;
   timeoutMs: number;
 }
 
@@ -46,20 +49,10 @@ export const CHANNEL_VARIABLES: Record<ChannelId, string> = {
   push: 'NW_NTFY_URL',
 };
 
-const tail = (secret: string) => `••••${secret.slice(-4)}`;
-
 /** What Settings shows for a configured channel: enough to recognise it, never enough to use it. */
 export function maskTarget(id: ChannelId, t: NotifyTargets): string | null {
-  switch (id) {
-    case 'discord':
-      return t.discord && `${new URL(t.discord.url).host}/api/webhooks/${tail(t.discord.url)}`;
-    case 'telegram':
-      return t.telegram && `chat ${t.telegram.chatId} via bot ${tail(t.telegram.token)}`;
-    case 'push':
-      return t.push && `${new URL(t.push.server).host}/${tail(t.push.topic)}`;
-    case 'email':
-      return t.email && t.email.to;
-  }
+  const target = t[id];
+  return target ? maskChannelTarget(id, target as never) : null;
 }
 
 const LABEL: Record<Message['kind'], string> = { firing: 'ALERT', resolved: 'RESOLVED', test: 'TEST' };
@@ -114,15 +107,16 @@ const senders: { [K in ChannelId]: (target: NonNullable<NotifyTargets[K]>, m: Me
       target.token ? { Authorization: `Bearer ${target.token}` } : {},
     ),
   email: async (target, m, deps) => {
-    if (!deps.mail) throw new Error('no SMTP server configured');
-    await deps.mail({ from: target.from, to: target.to, subject: heading(m), text: [m.body, m.url].filter(Boolean).join('\n\n') || m.title });
+    const mail = deps.mail ?? deps.mailer?.(target.smtpUrl);
+    if (!mail) throw new Error('no SMTP server configured');
+    await mail({ from: target.from, to: target.to, subject: heading(m), text: [m.body, m.url].filter(Boolean).join('\n\n') || m.title });
   },
 };
 
 /** Sends one message through one channel. Never throws: a failure is a result. */
 export async function send(id: ChannelId, targets: NotifyTargets, m: Message, deps: NotifyDeps): Promise<SendResult> {
   const target = targets[id];
-  if (!target) return { ok: false, error: `not configured — set ${CHANNEL_VARIABLES[id]} on the collector` };
+  if (!target) return { ok: false, error: `not set up — enter it in Settings or set ${CHANNEL_VARIABLES[id]} on the collector` };
   try {
     await (senders[id] as (t: typeof target, m: Message, deps: NotifyDeps) => Promise<void>)(target, m, deps);
     return { ok: true };

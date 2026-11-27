@@ -9,12 +9,12 @@ import * as mock from './mock/data';
 import * as reliability from './mock/reliability';
 import type {
   AlertsData, FinVaultData, HeartbeatsData, HostInfo, LogQuery, LogsData, MetricData, MetricId,
-  MetricsOverview, NavCounts, NexusInfraData, OverviewData, ServiceDetail, SettingsData, TimeRange,
+  MetricsOverview, NavCounts, NexusInfraData, OverviewData, ServiceCheckResult, ServiceDetail, SettingsData, TimeRange,
 } from './types';
 import type {
   IncidentDetail, IncidentsData, NewIncident, NewIncidentUpdate, ResolveIncident, SloData, StatusPageData,
 } from './types';
-import type { BusinessData, ChannelId, ChannelTestResult } from './types';
+import type { BusinessData, ChannelConfig, ChannelId, ChannelTestResult } from './types';
 import type {
   AlertRule, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleTestResult, Silence,
   SilenceInput,
@@ -102,6 +102,10 @@ export const api = {
         })
       : request(`/services/${encodeURIComponent(id)}`),
 
+  /** "Test now": runs one health check right away (404 for a service that is not monitored). */
+  checkService: (id: string): Promise<ServiceCheckResult> =>
+    config.useMocks ? fromMock(() => mock.checkService(id)) : request(`/services/${encodeURIComponent(id)}/check`, { method: 'POST' }),
+
   nexusInfra: (): Promise<NexusInfraData> => (config.useMocks ? fromMock(mock.nexusInfra) : request('/projects/nexusinfra')),
   finVault: (): Promise<FinVaultData> => (config.useMocks ? fromMock(mock.finVault) : request('/projects/finvault')),
 
@@ -110,6 +114,11 @@ export const api = {
   settings: (): Promise<SettingsData> => (config.useMocks ? fromMock(mock.settings) : request('/settings')),
   updateSettings: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>): Promise<void> =>
     config.useMocks ? fromMock(() => mock.updateSettings(patch)) : request('/settings', { method: 'PATCH', body: json(patch) }),
+  /** Sets up a channel; the body is write-only (422 when a field does not validate, 409 when .env sets it). */
+  configureChannel: (id: ChannelId, body: ChannelConfig): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.configureChannel(id, body)) : request(`/settings/channels/${id}`, { method: 'PUT', body: json(body) }),
+  removeChannel: (id: ChannelId): Promise<void> =>
+    config.useMocks ? fromMock(() => mock.removeChannelConfig(id)) : request(`/settings/channels/${id}`, { method: 'DELETE' }),
   /** Sends one test message through a channel. A failed delivery comes back as `{ ok: false }`, not as an error. */
   testChannel: (id: ChannelId): Promise<ChannelTestResult> =>
     config.useMocks ? fromMock(() => mock.testChannel(id)) : request(`/settings/channels/${id}/test`, { method: 'POST' }),

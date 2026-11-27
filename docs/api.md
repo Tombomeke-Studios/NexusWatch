@@ -51,7 +51,10 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 | `PUT /escalation-policies/:id` | `EscalationPolicyInput` | Replaces a policy |
 | `DELETE /escalation-policies/:id` | | Deletes a policy; rules that used it fall back to none |
 | `PATCH /settings` | any of `{ channels, routing, retention }` | Replaces the given settings sections. Of a channel only `enabled` is taken; `target` and `configured` are ignored |
+| `PUT /settings/channels/:id` | `ChannelConfig` (the fields `CHANNEL_FIELDS` lists for that channel) | Sets up a channel and switches it on. **Write-only**: the body is validated with `validateChannelConfig` (Discord only at discord.com, Telegram by token + chat id, ntfy/SMTP never at a loopback, link-local or metadata address), stored, and never returned — `Channel.target` stays masked. 204; 422 for a field that does not validate; 409 when the collector's `NW_*` variable sets that channel (it wins); 404 for an unknown channel |
+| `DELETE /settings/channels/:id` | | Forgets a channel set up in Settings → 204 (409 when set by `NW_*`) |
 | `POST /settings/channels/:id/test` | | Sends one test message through that channel → `ChannelTestResult` (404 for an unknown channel) |
+| `POST /services/:id/check` | | "Test now": one health check right away, stored with the others → `ServiceCheckResult` (404 when the service is not monitored) |
 
 A write the backend refuses because the input is invalid answers **422** with a one-line reason as
 the body; an unknown id answers **404**.
