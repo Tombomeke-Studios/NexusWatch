@@ -160,6 +160,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `dashboard/index.html` | Viewport (`viewport-fit=cover`), `theme-color`, manifest + apple-touch-icon links, and a pre-paint script that applies the stored theme |
 | `dashboard/public/` | `favicon.svg`, PWA `manifest.webmanifest`, icons (`icon*.svg` sources → `icon-192/512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`), `sw.js` (app-shell service worker, never caches `/api`) |
 | `dashboard/scripts/render-icons.sh` | Regenerates the PNG icons from the SVG sources with headless Chrome |
+| `.github/workflows/ci.yml` | Every push to dev/staging/main and every PR: build, lint, test, and both images built (not pushed) |
 | `.github/workflows/release.yml` | On a `v*` tag: build/lint/test, push `ghcr.io/<owner>/nexuswatch/{collector,dashboard}:<version>` + `latest`, create the GitHub release |
 | `.claude/launch.json` | Browser-preview entries: `dashboard` (sample data), `dashboard+collector` |
 | `.env.example` | Every collector variable (sources, notification targets, timings, retention prune) |

@@ -60,12 +60,12 @@ _(no active branch)_
 - [ ] `nexuswatch/agent` container from the Settings design: heartbeats, metrics, logs to the server (#—)
 
 ### Infra
-- [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 - [ ] Per-target metrics token (`NW_METRICS_TOKEN` is one token for every target; hosted and community NexusInfra may differ) (#—)
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
 ### `feature/polish` — merged into `dev`
+- [x] CI on every push to dev/staging/main and every PR: build, lint, test, both images (#—)
 - [x] `npm run dev` starts without a root `.env`; `/health` reports the package version (#—)
 - [x] Charts draw a short live series against "now" (`slots`); the requests chart scales to its data (`niceMax`) (#—)
 - [x] Node / bus-source alerts link to Heartbeats; host card says "no nodes reporting"; Overview events open the line in Logs (#—)
