@@ -1,4 +1,5 @@
 /** Entry point: config → store → sources → HTTP. Everything here is wiring; logic lives in tested modules. */
+import './env.js';
 import { rulesTask } from './alerting/evaluate.js';
 import { loadConfig } from './config.js';
 import { notifyTask } from './notify/dispatch.js';
