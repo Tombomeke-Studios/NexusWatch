@@ -5,6 +5,7 @@
  * modules; every successful write stores a snapshot in SQLite (views/persist.ts) so it survives a
  * restart. TODO.md tracks moving each one to a real source.
  */
+import { openAlertTargets, resolveLive } from './alerts.js';
 import { reliability, sample } from '../sample.js';
 import { businessData } from './business.js';
 import { incidentLive, incidentsLive, slosLive, statusLive } from './reliability.js';
@@ -65,13 +66,18 @@ export const sampledRoutes: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: s
   { method: 'POST', path: '/incidents/:id/resolve', handle: byId(reliability.resolveIncident) },
   { method: 'GET', path: '/status', handle: (ctx) => (ctx.live.logs ? statusLive(ctx) : reliability.statusPage()) },
 
-  { method: 'POST', path: '/alerts/:id/resolve', handle: (ctx, { params, body }) => run(ctx, () => sample.resolveAlert(params.id, note(body))) },
+  {
+    method: 'POST',
+    path: '/alerts/:id/resolve',
+    handle: (ctx, { params, body }) => (ctx.live.logs ? (resolveLive(ctx, params.id, note(body)), null) : run(ctx, () => sample.resolveAlert(params.id, note(body)))),
+  },
   // `/alert-rules/test` before `/alert-rules/:id` — same method family, and "test" is not an id.
   { method: 'POST', path: '/alert-rules/test', handle: (ctx, { body }) => (ctx.live.logs ? testRuleLive(ctx, checkedRule(body)) : sample.testRule(body as never)) },
   { method: 'POST', path: '/alert-rules', handle: withBody(sample.createRule) },
   { method: 'PUT', path: '/alert-rules/:id', handle: byId(sample.updateRule) },
   { method: 'DELETE', path: '/alert-rules/:id', handle: byId(sample.deleteRule) },
-  { method: 'POST', path: '/silences', handle: withBody(sample.createSilence) },
+  // Live: a silence on one alert, or "until resolved", is checked against the open alerts.
+  { method: 'POST', path: '/silences', handle: (ctx, { body }) => run(ctx, () => sample.createSilence(body as never, ctx.live.logs ? openAlertTargets(ctx) : undefined)) },
   { method: 'DELETE', path: '/silences/:id', handle: byId(sample.deleteSilence) },
   { method: 'POST', path: '/maintenance-windows', handle: (ctx, { body }) => run(ctx, () => sample.createMaintenance(body as never, knownServices(ctx))) },
   { method: 'PUT', path: '/maintenance-windows/:id', handle: (ctx, { params, body }) => run(ctx, () => sample.updateMaintenance(params.id, body as never, knownServices(ctx))) },

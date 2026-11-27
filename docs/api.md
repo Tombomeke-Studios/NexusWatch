@@ -153,8 +153,10 @@ the first write; from then on the stored incidents and windows keep the times th
 instead of moving with the clock. Errors keep the statuses in the tables above (404 unknown, 409
 already resolved, 400 invalid input), and a refused write stores nothing.
 
-Without a live source, `POST /alerts/:id/ack` keeps the note and the time of acknowledgement, and
-answers 404 for an alert that is not active.
+`POST /alerts/:id/ack` keeps the note and the time of acknowledgement (live: in SQLite) and answers 404
+for an alert that is not active. Live, `POST /alerts/:id/resolve` closes the alert's incident with the note
+(a source that still fails opens a new one on its next check), and a silence on one alert or "until
+resolved" is checked against the open alerts and ends when they close.
 
 **Rule evaluation.** With a live source the collector evaluates every enabled rule on an interval
 (`NW_RULES_INTERVAL_MS`), with the semantics of `lib/rules.ts`. Metrics with a source: `latency` per

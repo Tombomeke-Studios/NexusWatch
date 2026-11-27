@@ -14,7 +14,6 @@ _(no active branch)_
 - [ ] FinVault page: invoices, FX, wallet types, security counters and RabbitMQ queue depths have no read-only source (management API, FinVault events) (#—)
 - [ ] NexusInfra page: containers on other nodes than the collector's host (only the local Docker socket is read); nodes without memory in their heartbeat read 0 / 0 GB (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
-- [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
 - [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
 - [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
@@ -65,6 +64,7 @@ _(no active branch)_
 
 ## Done
 ### `feature/polish` — merged into `dev`
+- [x] Live alerts: acknowledge and resolve keep time and note; mute one alert; "until resolved" silences end with the alert (#—)
 - [x] Monitors from the dashboard: add on Heartbeats, pause / resume / remove on Service detail; same host rules as channels (#—)
 - [x] Optional login (`NW_DASHBOARD_PASSWORD`): session cookie, rate-limited, `/status` public; Settings warns without it (#—)
 - [x] CI on every push to dev/staging/main and every PR: build, lint, test, both images (#—)

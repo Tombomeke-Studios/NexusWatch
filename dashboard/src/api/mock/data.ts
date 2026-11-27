@@ -516,16 +516,23 @@ export function testRule(input: Pick<AlertRuleInput, 'project' | 'condition'>): 
   return { evaluatedAt: new Date().toISOString(), fires, targets };
 }
 
-export function createSilence(input: SilenceInput): Silence {
+/**
+ * `active`: the alerts open right now. The collector passes its live ones; without it the sample's are used.
+ */
+export function createSilence(input: SilenceInput, active?: { id: string; title: string; ruleId: string }[]): Silence {
   const reasonError = validateReason(input.reason);
   if (reasonError) throw invalid(reasonError);
   let label: string;
   if (input.kind === 'alert') {
-    label = firedAlert(input.targetId).title;
+    if (active) {
+      const a = active.find((x) => x.id === input.targetId);
+      if (!a) throw new ApiError(404, `Alert ${input.targetId} is not active`);
+      label = a.title;
+    } else label = firedAlert(input.targetId).title;
   } else {
     const rule = rules.find((r) => r.id === input.targetId);
     if (!rule) throw new ApiError(404, `Rule ${input.targetId} not found`);
-    if (input.duration === 'resolved' && !activeAlerts().some((a) => a.ruleId === rule.id)) throw invalid('This rule has no active alert to wait for');
+    if (input.duration === 'resolved' && !(active ?? activeAlerts()).some((a) => a.ruleId === rule.id)) throw invalid('This rule has no active alert to wait for');
     label = `${rule.name} (${rule.project === 'finvault' ? 'FinVault' : 'NexusInfra'})`;
   }
   const silence: Silence = { id: nextId('sil'), kind: input.kind, targetId: input.targetId, label, reason: input.reason.trim(), createdAt: new Date().toISOString(), endsAt: silenceEndsAt(input.duration, Date.now()) };
