@@ -67,6 +67,10 @@ Without any source, every endpoint serves the built-in sample data (for developm
 Also `NW_PORT` (8080), `NW_DB_PATH`, intervals, timeouts and thresholds, all listed in `.env.example`.
 `GET http://localhost:8080/health` shows which parts are live and each source's last error.
 
+**Login.** Set `NW_DASHBOARD_PASSWORD` (8+ characters) to require a password for the dashboard and its
+API; `/status` and `/health` stay public. Without it, anyone who reaches the port can change settings —
+Settings says so.
+
 **Notifications** are set up in Settings → Notifications: "Set up" per channel (Discord webhook,
 Telegram bot token + chat id, ntfy server/topic, SMTP), then "Send test". What you enter is stored on the
 collector and never shown again, only masked. A `NW_*` variable for a channel wins over Settings. An incident notifies once when it opens and once when it closes.

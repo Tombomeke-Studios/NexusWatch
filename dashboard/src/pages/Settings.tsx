@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRemoveChannel, useSettings, useTestChannel, useUpdateSettings } from '@/api/queries';
+import { useAuth, useLogout, useRemoveChannel, useSettings, useTestChannel, useUpdateSettings } from '@/api/queries';
 import type { Channel, ChannelId, SettingsData, Severity } from '@/api/types';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/Dialog';
@@ -23,9 +23,21 @@ const TABS: { id: Tab; label: string }[] = [
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('agents');
   const query = useSettings();
+  const auth = useAuth();
+  const logout = useLogout();
   return (
     <>
-      <PageHeader title="Settings" subtitle={<>Agents, notifications, storage and appearance{config.useMocks && ' · sample data'}</>} />
+      <PageHeader title="Settings" subtitle={<>Agents, notifications, storage and appearance{config.useMocks && ' · sample data'}</>}>
+        {auth.data?.required && (
+          <button type="button" className="btn" disabled={logout.isPending} onClick={() => logout.mutate()}>Log out</button>
+        )}
+      </PageHeader>
+      {!config.useMocks && auth.data && !auth.data.required && (
+        <div className="box" role="note" style={{ padding: '12px 18px', borderColor: 'var(--c-warn)', fontSize: 13.5 }}>
+          <strong>No password set.</strong> Anyone who can open this dashboard can change its notifications and alerting.
+          Set <span className="mono">NW_DASHBOARD_PASSWORD</span> on the collector to require a login.
+        </div>
+      )}
       <div style={{ alignSelf: 'flex-start' }}>
         <Segmented tabs label="Settings" options={TABS} value={tab} onChange={setTab} />
       </div>

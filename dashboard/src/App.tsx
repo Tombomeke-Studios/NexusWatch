@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { AuthGate } from '@/components/layout/AuthGate';
 import { OverviewPage } from '@/pages/Overview';
 import { MetricsPage } from '@/pages/Metrics';
 import { LogsPage } from '@/pages/Logs';
@@ -19,7 +20,11 @@ import { StatusPage } from '@/pages/StatusPage';
 /** Route table. Paths mirror `routes.ts`. */
 export const routeTable: RouteObject[] = [
   {
-    element: <AppShell />,
+    element: (
+      <AuthGate>
+        <AppShell />
+      </AuthGate>
+    ),
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'heartbeats', element: <HeartbeatsPage /> },

@@ -7,6 +7,8 @@ server {
     proxy_pass ${NW_API_UPSTREAM};
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # So the collector marks the session cookie Secure when this is served over https.
+    proxy_set_header X-Forwarded-Proto $scheme;
     proxy_read_timeout 30s;
   }
 

@@ -51,6 +51,9 @@ What the dashboard expects from the NexusWatch backend. Shapes are defined in
 | `PUT /escalation-policies/:id` | `EscalationPolicyInput` | Replaces a policy |
 | `DELETE /escalation-policies/:id` | | Deletes a policy; rules that used it fall back to none |
 | `PATCH /settings` | any of `{ channels, routing, retention }` | Replaces the given settings sections. Of a channel only `enabled` is taken; `target` and `configured` are ignored |
+| `GET /auth` | | `AuthState` — `required` (a password is set) and `authenticated` (this browser has a session). Always public |
+| `POST /auth/login` | `{ password }` | Sets an HttpOnly, SameSite=Strict session cookie (30 days) → 204; 401 wrong password; 429 after 5 wrong tries a minute from one address |
+| `POST /auth/logout` | | Ends the session → 204 |
 | `PUT /settings/channels/:id` | `ChannelConfig` (the fields `CHANNEL_FIELDS` lists for that channel) | Sets up a channel and switches it on. **Write-only**: the body is validated with `validateChannelConfig` (Discord only at discord.com, Telegram by token + chat id, ntfy/SMTP never at a loopback, link-local or metadata address), stored, and never returned — `Channel.target` stays masked. 204; 422 for a field that does not validate; 409 when the collector's `NW_*` variable sets that channel (it wins); 404 for an unknown channel |
 | `DELETE /settings/channels/:id` | | Forgets a channel set up in Settings → 204 (409 when set by `NW_*`) |
 | `POST /settings/channels/:id/test` | | Sends one test message through that channel → `ChannelTestResult` (404 for an unknown channel) |
@@ -110,6 +113,9 @@ The backend is `collector/` (see [architecture.md](architecture.md)). Every endp
 served: a part with a configured source is answered from stored data ("live"), every other part from
 the dashboard's own sample generators, so the API is complete from the first start. `GET /health`
 lists which parts are live.
+
+**Login.** With `NW_DASHBOARD_PASSWORD` set, every endpoint answers 401 without a session cookie,
+except `GET /status` (public by design), `/auth/*` and the root `/health`. Without it the API is open.
 
 **No sample data once a source is set.** With any source configured, every endpoint answers from what
 the collector measured; a part without a source answers empty or unknown (`series: []`, `–` summaries,

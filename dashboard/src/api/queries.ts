@@ -84,6 +84,20 @@ export function useUpdateSettings() {
   });
 }
 
+/** Login state; refetched whenever any request answers 401 (see `main.tsx`). */
+export const useAuth = () => useQuery({ queryKey: ['auth'], queryFn: api.auth, staleTime: Infinity, retry: false });
+
+export function useLogin() {
+  const qc = useQueryClient();
+  // A new session: everything fetched before it (401s) is stale.
+  return useMutation({ mutationFn: (password: string) => api.login(password), onSuccess: () => qc.invalidateQueries() });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.logout, onSuccess: () => qc.invalidateQueries({ queryKey: ['auth'] }) });
+}
+
 /** "Test now" on a service: the new check lands in its history, so the page refreshes. */
 export function useCheckService(id: string) {
   const qc = useQueryClient();

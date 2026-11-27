@@ -467,6 +467,12 @@ export type ChannelSource = 'env' | 'settings';
  */
 export type ChannelConfig = Record<string, string>;
 
+/** `GET /auth`: whether the dashboard needs a login (NW_DASHBOARD_PASSWORD) and whether this browser has one. */
+export interface AuthState {
+  required: boolean;
+  authenticated: boolean;
+}
+
 /** Answer of `POST /services/:id/check` ("Test now"): one health check, run right away and stored. */
 export interface ServiceCheckResult {
   at: string;

@@ -14,7 +14,7 @@ import type {
 import type {
   IncidentDetail, IncidentsData, NewIncident, NewIncidentUpdate, ResolveIncident, SloData, StatusPageData,
 } from './types';
-import type { BusinessData, ChannelConfig, ChannelId, ChannelTestResult } from './types';
+import type { AuthState, BusinessData, ChannelConfig, ChannelId, ChannelTestResult } from './types';
 import type {
   AlertRule, AlertRuleInput, EscalationPolicy, EscalationPolicyInput, MaintenanceInput, MaintenanceWindow, RuleTestResult, Silence,
   SilenceInput,
@@ -101,6 +101,17 @@ export const api = {
           return detail;
         })
       : request(`/services/${encodeURIComponent(id)}`),
+
+  /** Login state. Sample data never asks for one; a backend without `/auth` (older collector) neither. */
+  auth: (): Promise<AuthState> =>
+    config.useMocks
+      ? Promise.resolve({ required: false, authenticated: true })
+      : request<AuthState>('/auth').catch((err: unknown) => {
+          if (err instanceof ApiError && err.status === 404) return { required: false, authenticated: true };
+          throw err;
+        }),
+  login: (password: string): Promise<void> => request('/auth/login', { method: 'POST', body: json({ password }) }),
+  logout: (): Promise<void> => request('/auth/logout', { method: 'POST' }),
 
   /** "Test now": runs one health check right away (404 for a service that is not monitored). */
   checkService: (id: string): Promise<ServiceCheckResult> =>

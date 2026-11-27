@@ -1,14 +1,39 @@
 /** The HTTP app: the route table under `/api`, plus `/health` at the root for Docker. */
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { Auth, SESSION_COOKIE, SESSION_TTL_MS, isPublic, sessionFrom } from './auth.js';
 import { HttpError, collectorHealth, routes } from './routes.js';
 import type { Ctx } from './views/ctx.js';
 
 export function createApp(ctx: Ctx) {
   const app = express();
   app.disable('x-powered-by');
+  // nginx in front: the client address and https come from its X-Forwarded-* headers.
+  app.set('trust proxy', 'loopback, uniquelocal');
   app.use(express.json({ limit: '256kb' }));
 
+  const auth = new Auth(ctx.store, ctx.config.dashboardPassword, ctx.clock);
   const api = express.Router();
+
+  // ── Login (public) ──
+  api.get('/auth', (req, res) => {
+    res.json({ required: auth.required, authenticated: auth.allows(sessionFrom(req.headers.cookie)) });
+  });
+  api.post('/auth/login', (req, res) => {
+    const token = auth.login((req.body as { password?: unknown } | undefined)?.password, req.ip ?? 'unknown');
+    res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'strict', secure: req.secure, maxAge: SESSION_TTL_MS, path: '/' });
+    res.status(204).end();
+  });
+  api.post('/auth/logout', (req, res) => {
+    auth.logout(sessionFrom(req.headers.cookie));
+    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    res.status(204).end();
+  });
+  // Everything else needs a session once a password is set.
+  api.use((req: Request, res: Response, next: NextFunction) => {
+    if (isPublic(req.method, req.path) || auth.allows(sessionFrom(req.headers.cookie))) return next();
+    res.status(401).type('text/plain').send('Log in first');
+  });
+
   for (const route of routes) {
     const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
     api[method](route.path, async (req: Request, res: Response) => {

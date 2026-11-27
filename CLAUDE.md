@@ -192,6 +192,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/useMediaQuery.ts` | `useMediaQuery`, `useIsNarrow` and `NARROW_QUERY` (`max-width: 820px`) — the one breakpoint, also used in `app.css` |
 | `components/layout/nav.ts` | **Every nav entry** (`NAV`) for both shells, plus pure `tabItems`, `moreItems`, `isNavActive`, `isMoreActive`, `titleFor`. A new page adds one entry here |
 | `components/layout/` | `AppShell` (background, sidebar *or* mobile bars, outlet, `theme-color` sync), `Sidebar` + `NavEntry` (desktop), `MobileNav` (`MobileTopBar`, `MobileTabBar` with the More sheet), `HostCard`, `Logo` |
+| `components/layout/AuthGate.tsx` · `pages/Login.tsx` | Shows the login screen instead of the shell while `/auth` says a password is required; any 401 re-asks (`main.tsx`) |
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
 | `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
@@ -222,7 +223,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `config.ts` | `loadConfig(env)` — every `NW_*` variable, validated; a source is off until its variable is set |
 | `contract.ts` · `sample.ts` | Re-export the dashboard's `api/types.ts` and `api/mock/data.ts` (never copied) |
 | `routes.ts` | **Every endpoint, one table** (`/health` + docs/api.md); add an endpoint here |
-| `server.ts` | Express app: routes under `/api`, `/health` at the root, `HttpError` → status + text |
+| `server.ts` | Express app: routes under `/api` (behind the login middleware), `/api/auth/*`, `/health` at the root, `HttpError` → status + text |
+| `auth.ts` | Optional login (`NW_DASHBOARD_PASSWORD`): hashed sessions in SQLite, HttpOnly cookie, 5 wrong tries/min per address, `isPublic` paths |
 | `store.ts` | SQLite (`node:sqlite`): logs, checks, samples, heartbeat sources, incidents, key/value, business events (never pruned); `prune`, `usage` |
 | `duration.ts` | `parseDuration('14d')`, time ranges |
 | `sources/health.ts` | Heartbeat checker: `checkOnce`, `runHealthCheck` (logs + incidents) |
@@ -294,6 +296,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   never returned: `Channel.target` is masked, `PATCH /settings` keeps nothing of a channel but `enabled`.
   Any other endpoint that takes a URL for the collector to call needs the same host checks. Send every
   channel error through `send()`, which scrubs secrets.
+- **A new public endpoint goes in `isPublic` (`auth.ts`)** — everything else needs a session once a password is
+  set. `/status` must stay public; never make a write public.
 - **Route handlers may be async** (`server.ts` awaits them); a rejected promise reaches the error handler.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in

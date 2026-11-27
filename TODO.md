@@ -39,7 +39,7 @@ _(no active branch)_
 - [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
 
 ### Dashboard
-- [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
+- [ ] Login: more than one user / roles (today one shared password) (#—)
 - [ ] Wire the "Coming soon" actions: add monitor, test check, rotate agent token (#—)
 - [ ] Alerting follow-ups: Overview's open-alert KPI is still hard-coded in the mock; Service detail's "Escalation" setting is static text — read both from `/alerts` (#—)
 - [ ] Alerting follow-ups: a rule has no per-service/queue scope yet (it covers every target of its project); add label filters like `service="…"` (#—)
@@ -65,6 +65,7 @@ _(no active branch)_
 
 ## Done
 ### `feature/polish` — merged into `dev`
+- [x] Optional login (`NW_DASHBOARD_PASSWORD`): session cookie, rate-limited, `/status` public; Settings warns without it (#—)
 - [x] CI on every push to dev/staging/main and every PR: build, lint, test, both images (#—)
 - [x] `npm run dev` starts without a root `.env`; `/health` reports the package version (#—)
 - [x] Charts draw a short live series against "now" (`slots`); the requests chart scales to its data (`niceMax`) (#—)
