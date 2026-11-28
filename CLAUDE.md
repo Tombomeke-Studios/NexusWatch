@@ -192,6 +192,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/useMediaQuery.ts` | `useMediaQuery`, `useIsNarrow` and `NARROW_QUERY` (`max-width: 820px`) — the one breakpoint, also used in `app.css` |
 | `components/layout/nav.ts` | **Every nav entry** (`NAV`) for both shells, plus pure `tabItems`, `moreItems`, `isNavActive`, `isMoreActive`, `titleFor`. A new page adds one entry here |
 | `components/layout/` | `AppShell` (background, sidebar *or* mobile bars, outlet, `theme-color` sync), `Sidebar` + `NavEntry` (desktop), `MobileNav` (`MobileTopBar`, `MobileTabBar` with the More sheet), `HostCard`, `Logo` |
+| `components/layout/ConnectionBanner.tsx` | "Collector unreachable" line above every page while `/nav` gets no answer (0 / 502–504) |
 | `components/layout/AuthGate.tsx` · `pages/Login.tsx` | Shows the login screen instead of the shell while `/auth` says a password is required; any 401 re-asks (`main.tsx`) |
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |

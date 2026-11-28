@@ -45,7 +45,6 @@ _(no active branch)_
 - [ ] Alerting follow-ups: a maintenance window's "Starts" uses the browser's time zone with no zone label; show it, and handle DST for weekly windows server-side (#—)
 - [ ] Time range actually changes query windows once the API supports it (#—)
 - [ ] Alerts tables: add `data-label` captions (left to `feature/alert-rules`, which rewrites that page) (#—)
-- [ ] Offline banner when the service worker serves the cached shell and `/api` is unreachable (#—)
 - [ ] Web push for alerts on the installed PWA (needs the backend's notification delivery) (#—)
 - [ ] Accessibility pass with axe in both themes (#—)
 - [ ] Business: click a top-up to see its events on the bus and the bridge's log lines (`routes.logsFor(reference)`) once the collector indexes references (#—)
@@ -63,6 +62,7 @@ _(no active branch)_
 ## Done
 ### `feature/slo-young` · `feature/escalation-delivery` — merged into `dev`
 - [x] A young SLO is judged by measured downtime; a burn window needs half its expected checks before it alerts (#—)
+- [x] "Collector unreachable" banner instead of every card failing on its own (#—)
 - [x] Notifications follow the rule's own channels and its escalation policy; acknowledging stops later steps (#—)
 ### `feature/polish` — merged into `dev`
 - [x] Pages load lazily (main bundle 596 → 346 kB); all pages swept at 390 / 1440 px in a production build (#—)
