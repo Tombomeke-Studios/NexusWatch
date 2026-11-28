@@ -32,7 +32,7 @@ workspace serving every path of [docs/api.md](docs/api.md) (health checks, Contr
 scrape, event-bus heartbeats → SQLite; sample data for anything without a source), and notification
 delivery for real incidents (Discord, Telegram, ntfy, email), and rule evaluation on live latency and node metrics.
 Business data (top-ups, payments, transfers, suspensions) comes from the bus too.
-**What does not:** the agent, escalation steps, rule metrics without a source (queue depth, 5xx rate, top-ups), what only the Billing Bridge's database or FinVault's services know (credits, standing, plans, invoices, FX, security).
+**What does not:** the agent, rule metrics without a source (queue depth, 5xx rate, top-ups), what only the Billing Bridge's database or FinVault's services know (credits, standing, plans, invoices, FX, security).
 
 **Relation to the other projects.** NexusWatch is a *read-only observer*. It never changes NexusInfra
 or FinVault state and never shares their databases. Built data sources (collector): NexusInfra's
@@ -244,7 +244,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `alerting/evaluate.ts` | `evaluateRules` / `rulesTask`: opens and closes `rule:<ruleId>:<target>` incidents; `testRuleLive`, `currentReading`, `parseSubject` |
 | `notify/channels.ts` | One sender per channel (Discord, Telegram, ntfy, email), `send()` that never throws, `maskTarget`, error scrubbing |
 | `notify/targets.ts` | Channel targets set up in Settings (SQLite, write-only), `effectiveTargets` (NW_* wins), `configureChannel` / `removeChannel` |
-| `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
+| `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `firingChannels` (rule's channels + due escalation steps, stopped by acknowledge); `testChannel` for "Send test" |
 | `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
 | `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business without a bus, SLOs, incidents, `/status` and the alerting writes — sample generators), `persist` (snapshots the sample modules' alerting and incident state into SQLite after each write; `createCtx` restores it) |

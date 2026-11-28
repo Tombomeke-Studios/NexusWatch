@@ -12,7 +12,7 @@ import type { ChannelId, ChannelTestResult } from '../contract.js';
 import type { Task } from '../sources/types.js';
 import type { IncidentRow } from '../store.js';
 import { DAY_MS, iso, type Ctx } from '../views/ctx.js';
-import { suppression, suppressors } from '../views/alerts.js';
+import { alertTarget, isAcknowledged, rules, suppression, suppressors } from '../views/alerts.js';
 import { settings } from '../views/settings.js';
 import { CHANNEL_IDS, send, type Message } from './channels.js';
 
@@ -31,6 +31,26 @@ type State = Record<string, { firing: Progress; resolved?: Progress }>;
 export function channelsFor(ctx: Ctx, severity: IncidentRow['severity']): ChannelId[] {
   const s = settings(ctx);
   return s.channels.filter((c) => c.enabled && c.configured && s.routing[severity]?.[c.id]).map((c) => c.id);
+}
+
+/**
+ * Where an open incident's "firing" message goes right now:
+ * - its rule's own channels, when the rule names any; else the severity routing of Settings;
+ * - plus every step of the rule's escalation policy whose delay has passed — the first step always,
+ *   later ones only while nobody acknowledged the alert.
+ * Only channels that are switched on and have a target.
+ */
+export function firingChannels(ctx: Ctx, i: IncidentRow, now: number): ChannelId[] {
+  const usable = new Set(settings(ctx).channels.filter((c) => c.enabled && c.configured).map((c) => c.id));
+  const rule = rules(ctx).find((r) => r.id === alertTarget(i).ruleId);
+  const base = rule?.channels.length ? rule.channels : channelsFor(ctx, i.severity);
+  const policy = rule?.escalationPolicyId ? ctx.sample.alerts().policies.find((p) => p.id === rule.escalationPolicyId) : undefined;
+  const acked = isAcknowledged(ctx, i.id);
+  const minutes = (now - i.startedAt) / 60_000;
+  const escalated = (policy?.steps ?? [])
+    .filter((step, n) => step.afterMinutes <= minutes && (n === 0 || step.afterMinutes === 0 || !acked))
+    .map((step) => step.channel);
+  return [...new Set([...base, ...escalated])].filter((c) => usable.has(c));
 }
 
 function message(ctx: Ctx, i: IncidentRow, kind: 'firing' | 'resolved'): Message {
@@ -89,7 +109,7 @@ export async function notifyOnce(ctx: Ctx): Promise<void> {
     // Held, not dropped: if the alert is still open when the silence or window ends, it is sent then.
     const held = suppression(ctx, i, by);
     if (held.silenceId || held.maintenanceId) continue;
-    await deliver(ctx, i, 'firing', channelsFor(ctx, i.severity), entry.firing);
+    await deliver(ctx, i, 'firing', firingChannels(ctx, i, now), entry.firing);
   }
 
   for (const [id, entry] of Object.entries(state)) {

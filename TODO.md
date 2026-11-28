@@ -14,7 +14,6 @@ _(no active branch)_
 - [ ] FinVault page: invoices, FX, wallet types, security counters and RabbitMQ queue depths have no read-only source (management API, FinVault events) (#—)
 - [ ] NexusInfra page: containers on other nodes than the collector's host (only the local Docker socket is read); nodes without memory in their heartbeat read 0 / 0 GB (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
-- [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
 - [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
 - [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
@@ -62,6 +61,9 @@ _(no active branch)_
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `feature/slo-young` · `feature/escalation-delivery` — merged into `dev`
+- [x] A young SLO is judged by measured downtime; a burn window needs half its expected checks before it alerts (#—)
+- [x] Notifications follow the rule's own channels and its escalation policy; acknowledging stops later steps (#—)
 ### `feature/polish` — merged into `dev`
 - [x] Pages load lazily (main bundle 596 → 346 kB); all pages swept at 390 / 1440 px in a production build (#—)
 - [x] Live alerts: acknowledge and resolve keep time and note; mute one alert; "until resolved" silences end with the alert (#—)
