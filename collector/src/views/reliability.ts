@@ -47,6 +47,7 @@ export function slosLive(ctx: Ctx): SloData {
         project: t.project,
         objective: `Health check answers within ${Math.round(t.timeoutMs / 1000)} s`,
         targetPct: ctx.config.sloTargetPct,
+        checkIntervalSeconds: Math.round(t.intervalMs / 1000),
         windowDays: WINDOW_DAYS,
         window: tallyOf(checks),
         daily,

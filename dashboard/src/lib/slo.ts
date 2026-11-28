@@ -61,6 +61,16 @@ export function budgetRemaining(targetPct: number, t: CheckTally): number | null
   return burn === null ? null : 1 - burn;
 }
 
+/**
+ * Budget by measured downtime: every failed check stands for one check interval of downtime. Unlike
+ * `budgetRemaining`, a young SLO with a single failed check is not read as 30 days of outage.
+ */
+export function downtimeBudget(targetPct: number, windowDays: number, bad: number, intervalSeconds: number): { remaining: number; remainingMinutes: number } {
+  const budget = errorBudgetMinutes(targetPct, windowDays);
+  const spent = (bad * intervalSeconds) / 60;
+  return { remainingMinutes: Math.round((budget - spent) * 100) / 100, remaining: budget > 0 ? 1 - spent / budget : 0 };
+}
+
 /** Budget left in minutes; negative when overspent. */
 export function remainingBudgetMinutes(targetPct: number, windowDays: number, t: CheckTally): number | null {
   const left = budgetRemaining(targetPct, t);
@@ -165,12 +175,27 @@ export interface SloSummary {
   state: SloState;
 }
 
+/**
+ * Whether a burn window holds enough checks to judge: at least half of what the interval promises.
+ * A monitor that started minutes ago would otherwise page on its first failed check. Without a known
+ * interval every window with data counts.
+ */
+export function windowCovered(slo: Pick<Slo, 'burnWindows' | 'checkIntervalSeconds'>, w: BurnWindow): boolean {
+  if (!slo.checkIntervalSeconds) return true;
+  const expected = (WINDOW_HOURS[w] * 3600) / slo.checkIntervalSeconds;
+  return answered(slo.burnWindows[w]) >= expected / 2;
+}
+
 /** Everything a page shows about one SLO, derived from its tallies. */
 export function summarizeSlo(slo: Slo): SloSummary {
-  const burn = Object.fromEntries(BURN_WINDOWS.map((w) => [w, burnRate(slo.targetPct, slo.burnWindows[w])])) as Record<BurnWindow, number | null>;
+  const burn = Object.fromEntries(
+    BURN_WINDOWS.map((w) => [w, windowCovered(slo, w) ? burnRate(slo.targetPct, slo.burnWindows[w]) : null]),
+  ) as Record<BurnWindow, number | null>;
   const alerts = evaluateBurnAlerts(burn, slo.windowDays);
-  const remaining = budgetRemaining(slo.targetPct, slo.window);
-  const remainingMinutes = remainingBudgetMinutes(slo.targetPct, slo.windowDays, slo.window);
+  // With the check interval known, measure downtime; otherwise extrapolate the observed error rate.
+  const measured = slo.checkIntervalSeconds && answered(slo.window) > 0 ? downtimeBudget(slo.targetPct, slo.windowDays, slo.window.bad, slo.checkIntervalSeconds) : null;
+  const remaining = measured ? measured.remaining : budgetRemaining(slo.targetPct, slo.window);
+  const remainingMinutes = measured ? measured.remainingMinutes : remainingBudgetMinutes(slo.targetPct, slo.windowDays, slo.window);
   return {
     attainment: attainment(slo.window),
     budgetMinutes: errorBudgetMinutes(slo.targetPct, slo.windowDays),

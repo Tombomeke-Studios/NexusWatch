@@ -197,6 +197,9 @@ Rules the live answers follow, beyond the shapes:
 
 ## Reliability: SLOs, incidents, public status
 
+`Slo.checkIntervalSeconds` (optional): with it the dashboard spends the error budget by measured downtime
+(failed checks × interval) and judges a burn window only once it holds half its expected checks.
+
 | Method & path | Body | Response type | Used by |
 |---|---|---|---|
 | `GET /slos` | | `SloData` | SLOs, Service detail SLO card |

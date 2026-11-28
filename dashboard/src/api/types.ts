@@ -565,6 +565,11 @@ export interface Slo {
   /** One tally per day of the window, oldest first (`windowDays` entries). */
   daily: CheckTally[];
   burnWindows: Record<BurnWindow, CheckTally>;
+  /**
+   * Seconds between checks. With it, the error budget counts measured downtime (failed checks ×
+   * interval); without, the observed error rate is taken for the whole window.
+   */
+  checkIntervalSeconds?: number;
 }
 
 export interface SloData {

@@ -275,6 +275,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   selected/unfolded line depend on it. The mock derives it from the line's content; the backend must use a stored id.
 - **SLO maths runs in the dashboard, from raw check tallies** (`lib/slo.ts`). `unknown` checks are excluded from
   every SLO figure; `slow` counts as good (availability objective). A missing burn window never fires an alert.
+  With `Slo.checkIntervalSeconds` the budget counts measured downtime (failed checks × interval) and a burn
+  window needs half its expected checks — so a monitor added minutes ago never reads as 30 days of outage.
 - **`/status` is public.** It sits outside `AppShell`, reads only `useStatusPage()`, and its types (`StatusPageData`)
   must never gain a host, address, port, target, node or internal id — `reliability.test.ts` checks the type and the
   response. Incidents show there only with `public: true`, under `publicTitle`, with public updates only.
