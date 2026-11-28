@@ -4,6 +4,8 @@ import type { Fetch } from '../sources/types.js';
 import { Store } from '../store.js';
 import { createCtx } from '../views/ctx.js';
 import { updateSettings } from '../views/settings.js';
+import { acknowledge, rules } from '../views/alerts.js';
+import { sample } from '../sample.js';
 import { MAX_ATTEMPTS, channelsFor, notifyOnce, testChannel } from './dispatch.js';
 
 const ENV = {
@@ -64,9 +66,49 @@ describe('notifyOnce', () => {
     expect(channelsFor(t.ctx, 'warning')).toEqual(['discord']);
     updateSettings(t.ctx, { channels: [{ id: 'discord', enabled: false }] as never });
     expect(channelsFor(t.ctx, 'critical')).toEqual(['push']);
+  });
+
+  it("sends to the rule's own channels, minus the ones switched off", async () => {
+    const t = setup();
+    // A down service is rule r2 ("Service down", FinVault): Discord and push, whatever the severity.
+    updateSettings(t.ctx, { channels: [{ id: 'discord', enabled: false }] as never });
     t.open('warning');
     await notifyOnce(t.ctx);
-    expect(t.calls).toHaveLength(0);
+    expect(t.calls.map((c) => new URL(c.url).host)).toEqual(['ntfy.sh']);
+  });
+
+  it('falls back to the severity routing when the rule no longer exists', async () => {
+    const t = setup();
+    // A deleted rule's incident: Settings routes critical to Discord and push.
+    t.store.openIncident({ subject: 'rule:r-gone:fv-invoice-service', project: 'finvault', severity: 'critical', title: 'Gone rule fired', note: '', startedAt: Date.UTC(2026, 0, 1, 12) });
+    await notifyOnce(t.ctx);
+    expect(t.calls.map((c) => new URL(c.url).host).sort()).toEqual(['discord.com', 'ntfy.sh']);
+  });
+
+  it('runs the escalation policy until someone acknowledges', async () => {
+    const env = { ...ENV, NW_TELEGRAM_BOT_TOKEN: '123456:ABCdefGHIjklMNOpqrSTUvwxYZ_12345', NW_TELEGRAM_CHAT_ID: '-100123' };
+    const t = setup(env);
+    const r2 = rules(t.ctx).find((r) => r.id === 'r2')!;
+    // Only Discord at once, Telegram after 5 min (ep_oncall), nothing else.
+    sample.updateRule('r2', { ...r2, channels: ['discord'], escalationPolicyId: 'ep_oncall' });
+    const i = t.open();
+    await notifyOnce(t.ctx);
+    expect(t.calls.map((c) => new URL(c.url).host)).toEqual(['discord.com']);
+    t.tick(6 * 60_000);
+    await notifyOnce(t.ctx);
+    expect(t.calls.map((c) => new URL(c.url).host)).toEqual(['discord.com', 'api.telegram.org']);
+
+    // A second incident that is acknowledged before the 5 minutes: no Telegram.
+    t.close();
+    await notifyOnce(t.ctx);
+    const before = t.calls.length;
+    const j = t.open();
+    expect(j.id).not.toBe(i.id);
+    acknowledge(t.ctx, j.id, 'on it');
+    t.tick(6 * 60_000);
+    await notifyOnce(t.ctx);
+    expect(t.calls.slice(before).map((c) => new URL(c.url).host)).toEqual(['discord.com']);
+    sample.updateRule('r2', r2);
   });
 
   it('retries a channel that failed, and gives up after the last attempt', async () => {

@@ -1,3 +1,4 @@
+import { ConnectionBanner } from './ConnectionBanner';
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useIsNarrow } from '@/lib/useMediaQuery';
@@ -49,6 +50,7 @@ export function AppShell() {
       <div className={`shell${narrow ? ' mobile' : ''}`}>
         {narrow ? <MobileTopBar /> : <Sidebar />}
         <main className="main" id="main">
+          <ConnectionBanner />
           <Outlet />
         </main>
         {narrow && <MobileTabBar />}

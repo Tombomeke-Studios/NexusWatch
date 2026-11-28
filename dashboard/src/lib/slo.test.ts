@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BURN_RULES, attainment, budgetRemaining, burnDown, burnRate, burnThreshold, errorBudgetMinutes, evaluateBurnAlerts,
-  remainingBudgetMinutes, sloState, sumTallies, summarizeSlo, tallyStatuses, timeToExhaustionMinutes,
+  downtimeBudget, windowCovered, remainingBudgetMinutes, sloState, sumTallies, summarizeSlo, tallyStatuses, timeToExhaustionMinutes,
 } from './slo';
 
 const T = (good: number, bad: number, unknown = 0) => ({ good, bad, unknown });
@@ -169,6 +169,25 @@ describe('sloState', () => {
     expect(sloState(0.1, [])).toBe('at-risk');
     expect(sloState(0.9, [{ id: 'slow' } as never])).toBe('at-risk');
     expect(sloState(0.9, [])).toBe('healthy');
+  });
+});
+
+describe('windowCovered', () => {
+  it('judges a burn window only once it holds half the checks its interval promises', () => {
+    const windows = (n: number) => Object.fromEntries(['5m', '30m', '1h', '2h', '6h', '24h'].map((w) => [w, { good: n, bad: 0, unknown: 0 }])) as never;
+    // 30 s checks: 5 min = 10 checks, so 5 are enough there; 1 h needs 60.
+    expect(windowCovered({ burnWindows: windows(5), checkIntervalSeconds: 30 }, '5m')).toBe(true);
+    expect(windowCovered({ burnWindows: windows(5), checkIntervalSeconds: 30 }, '1h')).toBe(false);
+    expect(windowCovered({ burnWindows: windows(1) }, '24h')).toBe(true);
+  });
+});
+
+describe('downtimeBudget', () => {
+  it('spends the budget by measured downtime, not by extrapolating a few checks over the window', () => {
+    // 99.5% over 30 days = 216 min of budget. One failed 30 s check spends 0.5 min of it.
+    expect(downtimeBudget(99.5, 30, 1, 30)).toEqual({ remainingMinutes: 215.5, remaining: expect.closeTo(0.9977, 3) });
+    expect(downtimeBudget(99.5, 30, 0, 30).remaining).toBe(1);
+    expect(downtimeBudget(99.9, 30, 100, 60).remainingMinutes).toBeCloseTo(-56.8);
   });
 });
 

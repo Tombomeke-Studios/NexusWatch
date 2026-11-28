@@ -29,6 +29,8 @@ function acknowledged(ctx: Ctx): Set<string> {
   return new Set(ctx.store.get<string[]>(ACKS) ?? []);
 }
 
+export const isAcknowledged = (ctx: Ctx, id: string) => acknowledged(ctx).has(id);
+
 const LIVE = 'alerts.live';
 /** What people did to live alerts: when each was acknowledged, and the notes (oldest first). */
 interface LiveAlertState {

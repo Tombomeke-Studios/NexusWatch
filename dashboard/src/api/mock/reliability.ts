@@ -85,6 +85,7 @@ function buildSlo(spec: SloSpec, seed: number): Slo {
     project: service.project,
     objective: 'Health check answers within 5 s',
     targetPct: spec.targetPct,
+    checkIntervalSeconds: 60 / CHECKS_PER_MINUTE,
     windowDays,
     window,
     daily,

@@ -32,7 +32,7 @@ workspace serving every path of [docs/api.md](docs/api.md) (health checks, Contr
 scrape, event-bus heartbeats → SQLite; sample data for anything without a source), and notification
 delivery for real incidents (Discord, Telegram, ntfy, email), and rule evaluation on live latency and node metrics.
 Business data (top-ups, payments, transfers, suspensions) comes from the bus too.
-**What does not:** the agent, escalation steps, rule metrics without a source (queue depth, 5xx rate, top-ups), what only the Billing Bridge's database or FinVault's services know (credits, standing, plans, invoices, FX, security).
+**What does not:** the agent, rule metrics without a source (queue depth, 5xx rate, top-ups), what only the Billing Bridge's database or FinVault's services know (credits, standing, plans, invoices, FX, security).
 
 **Relation to the other projects.** NexusWatch is a *read-only observer*. It never changes NexusInfra
 or FinVault state and never shares their databases. Built data sources (collector): NexusInfra's
@@ -192,6 +192,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/useMediaQuery.ts` | `useMediaQuery`, `useIsNarrow` and `NARROW_QUERY` (`max-width: 820px`) — the one breakpoint, also used in `app.css` |
 | `components/layout/nav.ts` | **Every nav entry** (`NAV`) for both shells, plus pure `tabItems`, `moreItems`, `isNavActive`, `isMoreActive`, `titleFor`. A new page adds one entry here |
 | `components/layout/` | `AppShell` (background, sidebar *or* mobile bars, outlet, `theme-color` sync), `Sidebar` + `NavEntry` (desktop), `MobileNav` (`MobileTopBar`, `MobileTabBar` with the More sheet), `HostCard`, `Logo` |
+| `components/layout/ConnectionBanner.tsx` | "Collector unreachable" line above every page while `/nav` gets no answer (0 / 502–504) |
 | `components/layout/AuthGate.tsx` · `pages/Login.tsx` | Shows the login screen instead of the shell while `/auth` says a password is required; any 401 re-asks (`main.tsx`) |
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
@@ -244,7 +245,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `alerting/evaluate.ts` | `evaluateRules` / `rulesTask`: opens and closes `rule:<ruleId>:<target>` incidents; `testRuleLive`, `currentReading`, `parseSubject` |
 | `notify/channels.ts` | One sender per channel (Discord, Telegram, ntfy, email), `send()` that never throws, `maskTarget`, error scrubbing |
 | `notify/targets.ts` | Channel targets set up in Settings (SQLite, write-only), `effectiveTargets` (NW_* wins), `configureChannel` / `removeChannel` |
-| `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
+| `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `firingChannels` (rule's channels + due escalation steps, stopped by acknowledge); `testChannel` for "Send test" |
 | `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
 | `views/` | Each response from the store, or sample data when not live: `services`, `nodes`, `logs`, `alerts`, `metrics`, `settings`, `pages` (shell, overview, heartbeats, projects), `series` (pure bucketing), `ctx` (`live` flags), `sampled` (business without a bus, SLOs, incidents, `/status` and the alerting writes — sample generators), `persist` (snapshots the sample modules' alerting and incident state into SQLite after each write; `createCtx` restores it) |
@@ -275,6 +276,8 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   selected/unfolded line depend on it. The mock derives it from the line's content; the backend must use a stored id.
 - **SLO maths runs in the dashboard, from raw check tallies** (`lib/slo.ts`). `unknown` checks are excluded from
   every SLO figure; `slow` counts as good (availability objective). A missing burn window never fires an alert.
+  With `Slo.checkIntervalSeconds` the budget counts measured downtime (failed checks × interval) and a burn
+  window needs half its expected checks — so a monitor added minutes ago never reads as 30 days of outage.
 - **`/status` is public.** It sits outside `AppShell`, reads only `useStatusPage()`, and its types (`StatusPageData`)
   must never gain a host, address, port, target, node or internal id — `reliability.test.ts` checks the type and the
   response. Incidents show there only with `public: true`, under `publicTitle`, with public updates only.

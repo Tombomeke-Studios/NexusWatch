@@ -176,7 +176,10 @@ target. Each message is sent once: what was delivered is stored, so a restart do
 channel that fails is retried on the next run, five times at most, and every delivery or failure is a
 log line of the `collector` service. The all-clear only goes to channels the alarm reached. Sample
 alerts never notify. A notification is held while the alert's rule is silenced or a maintenance window covers it, and sent
-when that ends if the alert is still open. Escalation steps do not affect delivery yet.
+when that ends if the alert is still open. An alert goes to its rule's own channels (the
+severity routing only for an incident whose rule no longer exists), plus each step of the rule's escalation
+policy once its delay has passed — later steps only while the alert is unacknowledged. Channels that are
+switched off or have no target are skipped.
 
 Rules the live answers follow, beyond the shapes:
 
@@ -196,6 +199,9 @@ Rules the live answers follow, beyond the shapes:
   value is not one of that kind's `options`.
 
 ## Reliability: SLOs, incidents, public status
+
+`Slo.checkIntervalSeconds` (optional): with it the dashboard spends the error budget by measured downtime
+(failed checks × interval) and judges a burn window only once it holds half its expected checks.
 
 | Method & path | Body | Response type | Used by |
 |---|---|---|---|
