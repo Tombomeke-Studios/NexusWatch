@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useService } from '@/api/queries';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCheckService, usePauseMonitor, useRemoveMonitor, useService } from '@/api/queries';
+import { ConfirmDialog } from '@/components/ui/Dialog';
 import type { LogEntry, ServiceDetail } from '@/api/types';
 import { LogDocument } from '@/components/LogDocument';
 import { SloCard } from '@/components/SloCard';
@@ -55,6 +56,11 @@ function ExpandableLogs({ entries }: { entries: LogEntry[] }) {
 
 function ServiceBody({ data }: { data: ServiceDetail }) {
   const { service, kpis } = data;
+  const check = useCheckService(service.id);
+  const pause = usePauseMonitor();
+  const remove = useRemoveMonitor();
+  const navigate = useNavigate();
+  const [removing, setRemoving] = useState(false);
   const down = service.status === 'down';
   const answered = data.responseTimes.filter((v): v is number => v !== null);
   const span = answered.length / data.responseTimes.length;
@@ -80,11 +86,36 @@ function ServiceBody({ data }: { data: ServiceDetail }) {
           </>
         }
       >
-        <button type="button" className="btn" disabled title="Coming soon">Test now</button>
-        <button type="button" className="btn" disabled title="Coming soon">Pause monitor</button>
-        <button type="button" className="btn danger" disabled title="Coming soon">Restart container</button>
+        {check.data && !check.isPending && (
+          <span role="status" className="mono small" style={{ alignSelf: 'center', color: check.data.status === 'down' ? 'var(--down)' : 'var(--ok)' }}>
+            {check.data.status === 'down' ? `down — ${check.data.note}` : `${check.data.status} · ${check.data.latencyMs} ms`}
+          </span>
+        )}
+        {check.isError && <span role="status" className="small" style={{ alignSelf: 'center', color: 'var(--down)' }}>could not run the check</span>}
+        <button type="button" className="btn" disabled={check.isPending} onClick={() => check.mutate()}>{check.isPending ? 'Checking…' : 'Test now'}</button>
+        <button type="button" className="btn" disabled={pause.isPending} onClick={() => pause.mutate({ id: service.id, paused: !data.paused })}>
+          {data.paused ? 'Resume monitor' : 'Pause monitor'}
+        </button>
+        {data.source === 'dashboard' && <button type="button" className="btn" onClick={() => setRemoving(true)}>Remove monitor</button>}
+        <button type="button" className="btn danger" disabled title="NexusWatch only observes: restart it in NexusInfra">Restart container</button>
       </PageHeader>
 
+      {removing && (
+        <ConfirmDialog
+          title={`Remove ${service.name}?`}
+          confirmLabel="Remove"
+          busy={remove.isPending}
+          onCancel={() => setRemoving(false)}
+          onConfirm={() => remove.mutate(service.id, { onSuccess: () => navigate(routes.heartbeats) })}
+        >
+          NexusWatch stops checking {data.target}. Its history stays until retention removes it.
+        </ConfirmDialog>
+      )}
+      {data.paused && (
+        <section className="box" role="status" style={{ padding: '12px 18px', fontSize: 13.5 }}>
+          <strong>Paused.</strong> This monitor is not checked and raises no alerts until you resume it.
+        </section>
+      )}
       {down && data.downSince && (
         <section className="box" role="alert" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px 20px', padding: '18px 22px', borderColor: 'var(--c-down)', background: 'var(--downS)' }}>
           <StatusDot live size={12} color="var(--c-down)" />
@@ -99,7 +130,7 @@ function ServiceBody({ data }: { data: ServiceDetail }) {
       <section className="kpis" aria-label="Key figures">
         <Kpi label="Uptime 24h" value={formatPercent(kpis.uptime24h)} valueColor={down ? 'var(--down)' : undefined} foot={kpis.downtime24hSeconds ? `${formatDuration(kpis.downtime24hSeconds)} downtime` : 'no downtime'} />
         <Kpi label="Uptime 30 days" value={formatPercent(kpis.uptime30d)} foot={`${kpis.incidents30d} incidents`} />
-        <Kpi label={down ? 'Response time (before outage)' : 'Response time'} value={kpis.avgLatencyMs} unit="ms" foot={`p95 ${kpis.p95LatencyMs} ms`} />
+        <Kpi label={down ? 'Response time (before outage)' : 'Response time'} value={kpis.avgLatencyMs ?? 'no answer'} unit={kpis.avgLatencyMs === null ? undefined : 'ms'} foot={kpis.p95LatencyMs === null ? 'no check answered in 24 h' : `p95 ${kpis.p95LatencyMs} ms`} />
         <Kpi label="Last check" value={formatClock(kpis.lastCheckAt)} valueStyle={{ fontSize: 24, fontWeight: 500, fontFamily: "'JetBrains Mono', monospace" }} foot={kpis.lastCheckNote} />
         <Kpi label="Restarts (24h)" value={kpis.restarts24h} valueColor={kpis.restarts24h > 2 ? 'var(--warn)' : undefined} foot={kpis.restarts24h > 2 ? 'crash loop suspected' : 'stable'} />
       </section>
@@ -142,7 +173,7 @@ function ServiceBody({ data }: { data: ServiceDetail }) {
           {data.dependencies.map((chain, ci) => (
             <div key={ci} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: ci ? 14 : 0 }}>
               {chain.nodes.map((n, i) => (
-                <Fragment key={n.name}>
+                <Fragment key={`${i}-${n.name}`}>
                   <div className={`dep${n.status === 'down' ? ' bad' : ''}`}>
                     <span className="mono" style={{ fontWeight: 500 }}>{n.name}</span>
                     <Pill tone={statusPill[n.status]} style={{ alignSelf: 'flex-start' }}>{n.note}</Pill>

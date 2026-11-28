@@ -118,7 +118,7 @@ function MetricChart({ data, range }: { data: MetricData; range: TimeRange }) {
           </div>
           <div className="end"><Legend series={data.series} /></div>
         </div>
-        <LineChart label={`${data.title} over time`} series={data.series} height={280} max={data.max} yLabels={yLabels} xLabels={axisLabels(range, 7)} />
+        <LineChart label={`${data.title} over time`} series={data.series} slots={90} height={280} max={data.max} yLabels={yLabels} xLabels={axisLabels(range, 7)} />
       </Card>
 
       <Card labelledBy="st">

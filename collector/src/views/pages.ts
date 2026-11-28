@@ -72,6 +72,8 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
     kpis: {
       ...base.kpis,
       ...(money ? { topupsToday: money.topupsToday, topupsTrend: money.topupsTrend, paymentsMonthEur: money.paymentsMonthEur, paymentsTrend: money.paymentsTrend } : {}),
+      // Without a bus nothing measures money: unknown, not 0.
+      ...(real && !ctx.live.business ? { topupsToday: null, topupsTrend: [], paymentsMonthEur: null, paymentsTrend: [] } : {}),
       servicesUp: list.filter((s) => s.status === 'up').length,
       servicesTotal: list.length,
       servicesSlow: list.filter((s) => s.status === 'slow').length,
@@ -87,6 +89,9 @@ export function overview(ctx: Ctx, range: TimeRange): OverviewData {
     requests,
     topupsPerHour: money ? money.topupsPerHour : base.topupsPerHour,
     paymentsPerDay: money ? money.paymentsPerDay : base.paymentsPerDay,
+    checkIntervalSeconds: !real
+      ? base.checkIntervalSeconds
+      : ctx.config.health.targets.length ? Math.round(Math.min(...ctx.config.health.targets.map((t) => t.intervalMs)) / 1000) : null,
   };
 }
 

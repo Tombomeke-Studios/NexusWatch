@@ -5,7 +5,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { config } from '@/lib/config';
 import { api } from './endpoints';
-import type { ChannelId, LogQuery, MetricId, SettingsData, TimeRange } from './types';
+import type { NewMonitor, ChannelConfig, ChannelId, LogQuery, MetricId, SettingsData, TimeRange } from './types';
 import type { NewIncident, NewIncidentUpdate, ResolveIncident } from './types';
 import type { AlertRuleInput, EscalationPolicyInput, MaintenanceInput, SilenceInput } from './types';
 
@@ -82,6 +82,52 @@ export function useUpdateSettings() {
     mutationFn: (patch: Partial<Pick<SettingsData, 'channels' | 'routing' | 'retention'>>) => api.updateSettings(patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
+}
+
+/** Add, remove or pause a monitor: everything that lists services changes, so refetch it all. */
+export function useMonitorMutation<T, R>(fn: (arg: T) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries() });
+}
+export const useAddMonitor = () => useMonitorMutation((input: NewMonitor) => api.addMonitor(input));
+export const useRemoveMonitor = () => useMonitorMutation((id: string) => api.removeMonitor(id));
+export const usePauseMonitor = () => useMonitorMutation(({ id, paused }: { id: string; paused: boolean }) => api.pauseMonitor(id, paused));
+
+/** Login state; refetched whenever any request answers 401 (see `main.tsx`). */
+export const useAuth = () => useQuery({ queryKey: ['auth'], queryFn: api.auth, staleTime: Infinity, retry: false });
+
+export function useLogin() {
+  const qc = useQueryClient();
+  // A new session: everything fetched before it (401s) is stale.
+  return useMutation({ mutationFn: (password: string) => api.login(password), onSuccess: () => qc.invalidateQueries() });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.logout, onSuccess: () => qc.invalidateQueries({ queryKey: ['auth'] }) });
+}
+
+/** "Test now" on a service: the new check lands in its history, so the page refreshes. */
+export function useCheckService(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.checkService(id),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: keys.service(id) }), qc.invalidateQueries({ queryKey: ['overview'] })]),
+  });
+}
+
+/** Set up or remove a notification channel; both change Settings. */
+export function useConfigureChannel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: ChannelId; body: ChannelConfig }) => api.configureChannel(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
+  });
+}
+
+export function useRemoveChannel() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: ChannelId) => api.removeChannel(id), onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }) });
 }
 
 /** "Send test" on a notification channel. Changes nothing, so it invalidates nothing. */

@@ -9,6 +9,7 @@
  * writes a warn/ok line; the Nth failure in a row opens an incident and the next good check
  * closes it.
  */
+import { isPaused } from '../monitors.js';
 import type { HealthTarget } from '../config.js';
 import type { HealthStatus } from '../contract.js';
 import type { Check, Store } from '../store.js';
@@ -92,6 +93,7 @@ export function healthTasks(targets: HealthTarget[], store: Store, fetchFn: Fetc
     name: `health:${t.id}`,
     intervalMs: t.intervalMs,
     run: async () => {
+      if (isPaused(store, t.id)) return;
       await runHealthCheck(t, store, fetchFn, clock, opts);
     },
   }));

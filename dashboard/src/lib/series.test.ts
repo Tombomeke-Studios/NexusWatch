@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areaPath, barHeights, linePath, rng, stats, walk } from './series';
+import { areaPath, barHeights, linePath, niceMax, rng, stats, walk } from './series';
 
 describe('rng', () => {
   it('is deterministic per seed', () => {
@@ -28,6 +28,12 @@ describe('walk', () => {
 });
 
 describe('linePath', () => {
+  it('draws a series shorter than its window against the right edge', () => {
+    // 3 of 5 slots: x at 50, 75, 100 — "now" stays at the right.
+    expect(linePath([0, 0, 0], 100, 50, 100, 100, 5)).toBe('M50.0 48.0 L75.0 48.0 L100.0 48.0');
+    expect(areaPath([0, 0, 0], 100, 50, 100, 5)).toBe('M50.0 48.0 L75.0 48.0 L100.0 48.0 L100 50 L50.0 50 Z');
+  });
+
   it('maps 0 to the bottom and max to the top with a 2px inset', () => {
     expect(linePath([0, 100], 100, 50)).toBe('M0.0 48.0 L100.0 2.0');
   });
@@ -68,5 +74,14 @@ describe('barHeights', () => {
 
   it('is all zeros when nothing happened', () => {
     expect(barHeights([0, 0])).toEqual([0, 0]);
+  });
+});
+
+describe('niceMax', () => {
+  it('rounds the peak up to 1, 2, 2.5 or 5 × 10ⁿ with headroom', () => {
+    expect(niceMax([1.6, 0.2])).toBe(2);
+    expect(niceMax([48])).toBe(100);
+    expect(niceMax([180])).toBe(200);
+    expect(niceMax([0, 0])).toBe(1);
   });
 });

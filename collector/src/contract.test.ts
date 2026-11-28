@@ -162,17 +162,31 @@ describe.each(modes)('HTTP contract — %s', (_mode, make) => {
 
   it('never returns a channel target it could send to, and stores only the switch', async () => {
     const s = await api.get<C.SettingsData>('/api/settings');
-    // No NW_* target is set in these tests: every channel says so instead of showing a placeholder URL.
+    // No NW_* target is set in these tests: every channel says how to set it up, and is off.
     for (const c of s.channels) {
-      expect(c.configured).toBe(false);
-      expect(c.target).toMatch(/^Not configured — set NW_/);
+      expect(c).toMatchObject({ configured: false, source: null, enabled: false });
+      expect(c.target).toMatch(/^Not set up — /);
     }
-    const flipped = s.channels.map((c) => (c.id === 'telegram' ? { ...c, enabled: !c.enabled, target: 'https://attacker.example/hook', configured: true } : c));
+    // PATCH keeps nothing of a channel but its switch: a smuggled target is ignored.
+    const flipped = s.channels.map((c) => (c.id === 'telegram' ? { ...c, enabled: true, target: 'https://attacker.example/hook', configured: true } : c));
     expect(await api.status('/api/settings', { method: 'PATCH', body: JSON.stringify({ channels: flipped }) })).toBe(204);
     const after = (await api.get<C.SettingsData>('/api/settings')).channels.find((c) => c.id === 'telegram')!;
-    expect(after.enabled).toBe(!s.channels.find((c) => c.id === 'telegram')!.enabled);
     expect(after.configured).toBe(false);
     expect(after.target).not.toContain('attacker');
+  });
+
+  it('sets up a channel write-only over PUT, refuses bad input, and removes it with DELETE', async () => {
+    const put = (id: string, body: unknown) => api.status(`/api/settings/channels/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    expect(await put('discord', { webhookUrl: 'https://attacker.example/api/webhooks/1/x' })).toBe(422);
+    expect(await put('push', { url: 'http://169.254.169.254/topic' })).toBe(422);
+    expect(await put('fax', {})).toBe(404);
+    expect(await put('discord', { webhookUrl: 'https://discord.com/api/webhooks/42/secret-token-value' })).toBe(204);
+    const text = JSON.stringify(await api.get<C.SettingsData>('/api/settings'));
+    expect(text).not.toContain('secret-token-value');
+    const discord = (await api.get<C.SettingsData>('/api/settings')).channels.find((c) => c.id === 'discord')!;
+    expect(discord).toMatchObject({ configured: true, source: 'settings', enabled: true });
+    expect(await api.status('/api/settings/channels/discord', { method: 'DELETE' })).toBe(204);
+    expect((await api.get<C.SettingsData>('/api/settings')).channels.find((c) => c.id === 'discord')).toMatchObject({ configured: false });
   });
 
   it('answers a channel test with a result, and 404 for a channel that does not exist', async () => {
@@ -292,6 +306,29 @@ describe('HTTP contract — live specifics', () => {
     expect(fv.services[0].service.status).toBe('slow');
     expect(fv.services[1].p95).toBe('timeout');
     expect(fv.services.every((s) => s.rps === null && s.errorPct === null)).toBe(true);
+  });
+
+  it('runs a health check on "Test now", shows the real check interval and NexusInfra agents', async () => {
+    const res = await fetch(`${api.base}/api/services/fv-api-gateway/check`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: expect.stringMatching(/^(up|slow|down)$/), at: expect.any(String) });
+    expect(await api.status('/api/services/nope/check', { method: 'POST' })).toBe(404);
+    expect((await api.get<C.OverviewData>('/api/overview?range=24h')).checkIntervalSeconds).toBe(30);
+    expect((await api.get<C.SettingsData>('/api/settings')).agentSource).toBe('nexusinfra');
+  });
+
+  it('adds, pauses and removes a monitor over HTTP, and refuses bad ones', async () => {
+    const send = (method: string, path: string, body?: unknown) =>
+      fetch(`${api.base}/api${path}`, { method, headers: { 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    expect((await send('POST', '/monitors', { name: 'x', project: 'finvault', url: 'http://127.0.0.1/' })).status).toBe(422);
+    const created = await send('POST', '/monitors', { name: 'Extra gateway', project: 'finvault', url: 'http://extra-gateway:8000/health' });
+    expect(created.status).toBe(200);
+    expect(await created.json()).toMatchObject({ serviceId: 'm-extra-gateway', source: 'dashboard', paused: false });
+    expect((await send('PUT', '/monitors/m-extra-gateway/paused', { paused: true })).status).toBe(204);
+    expect((await api.get<C.HeartbeatsData>('/api/heartbeats')).monitors.find((m) => m.serviceId === 'm-extra-gateway')?.paused).toBe(true);
+    expect((await send('DELETE', '/monitors/fv-api-gateway')).status).toBe(409);
+    expect((await send('DELETE', '/monitors/m-extra-gateway')).status).toBe(204);
+    expect((await api.get<C.HeartbeatsData>('/api/heartbeats')).monitors.some((m) => m.serviceId === 'm-extra-gateway')).toBe(false);
   });
 
   it('serves no sample data anywhere once a source is configured', async () => {

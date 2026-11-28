@@ -13,22 +13,15 @@ _(no active branch)_
 - [ ] Business: account standing, credits and revenue per plan need a `billing.credit.*` event from NexusInfra's Billing Bridge (its HTTP API takes the internal token, which can also change credit) (#—)
 - [ ] FinVault page: invoices, FX, wallet types, security counters and RabbitMQ queue depths have no read-only source (management API, FinVault events) (#—)
 - [ ] NexusInfra page: containers on other nodes than the collector's host (only the local Docker socket is read); nodes without memory in their heartbeat read 0 / 0 GB (#—)
-- [ ] Overview top-up / payment tiles read 0 without a bus — make them nullable (#—)
-- [ ] `npm run dev` crashes when the root `.env` is missing (`node --watch` with `--env-file-if-exists`) (#—)
 - [ ] Move the persisted alerting/incident snapshot to its own tables once rules are evaluated server-side (one JSON document per kind today) (#—)
-- [ ] Live mode: acknowledging keeps no note or time yet; muting a single live alert (not its rule) and "until resolved" silences still only work on sample alerts (#—)
 - [ ] Notifications: run escalation policy steps, and send to the rule's own channels (today: severity routing only) (#—)
 - [ ] Notifications: show the delivery log per alert (today: log lines of the `collector` service) (#—)
 - [ ] `npm audit`: moderate `minimatch` advisory through the ESLint toolchain (dev only; the fix is a breaking ESLint change) (#—)
 - [ ] Rule evaluation: sources for queue depth, 5xx rate and top-ups (FinVault); these rules report no data today (#—)
 - [ ] Rule evaluation: let heartbeat rules own "service down" instead of the health checker's fixed failure count (#—)
 - [ ] FinVault rps / error % per service (no `/metrics` in FinVault) (#—)
-- [ ] Make unmeasured numbers nullable in the contract: `Monitor.avgLatencyMs`, service-detail avg/p95 latency, `restarts24h`, `NodeSummary.containers` (#—)
+- [ ] Make unmeasured numbers nullable in the contract: `restarts24h`, `NodeSummary.containers` (#—)
 - [ ] Dependency chains on Service detail (collector returns `[]` — needs topology config) (#—)
-- [ ] Alerts for heartbeat sources link to `/services/<source>`, which 404s for nodes — link nodes to Heartbeats instead (#—)
-- [ ] Charts: align a live series that is shorter than the window to the right of the time axis (#—)
-- [ ] Heartbeats card says "every 30 s" — show the configured interval from the API (#—)
-- [ ] Host card shows sample "nodes connected" when no node source is configured — say "no node source" instead (#—)
 - [ ] Migrations directory once the schema needs a second version (schema is created on start today) (#—)
 - [ ] Move the contract (types + sample data) into its own workspace so the collector can use NodeNext resolution (#—)
 
@@ -40,14 +33,13 @@ _(no active branch)_
 - [ ] Incidents: edit postmortem and tick action items after resolving; link alerts to the incident they opened (#—)
 - [ ] Maintenance windows: create/edit in the dashboard, and mute alerts during them (#—)
 - [ ] Serve `/status` from a separate, unauthenticated origin once authentication lands; cache it (#—)
-- [ ] Service detail at 390 px: the 120-check strip (3 px gap) is ~600 px wide and scrolls the page sideways — existed before this branch (#—)
 
 - [ ] Storage with retention per data kind (logs / metrics / heartbeats) (#—)
 - [ ] Contract tests: run `api/mock/data.test.ts` invariants against the real API (#—)
 
 ### Dashboard
-- [ ] Authentication (who may see the dashboard) — decide before any data is real (#—)
-- [ ] Wire the "Coming soon" actions: add monitor, test check, rotate agent token (#—)
+- [ ] Login: more than one user / roles (today one shared password) (#—)
+- [ ] Edit a monitor added from the dashboard (today: remove and add again) (#—)
 - [ ] Alerting follow-ups: Overview's open-alert KPI is still hard-coded in the mock; Service detail's "Escalation" setting is static text — read both from `/alerts` (#—)
 - [ ] Alerting follow-ups: a rule has no per-service/queue scope yet (it covers every target of its project); add label filters like `service="…"` (#—)
 - [ ] Alerting follow-ups: the escalation display infers "sent" from elapsed time; once the collector delivers notifications, return the real delivery log per alert (#—)
@@ -57,8 +49,6 @@ _(no active branch)_
 - [ ] Offline banner when the service worker serves the cached shell and `/api` is unreachable (#—)
 - [ ] Web push for alerts on the installed PWA (needs the backend's notification delivery) (#—)
 - [ ] Accessibility pass with axe in both themes (#—)
-- [ ] Overview "Recent events": make events clickable the same way as service logs (#—)
-- [ ] Code-split pages (bundle is 444 kB before gzip) (#—)
 - [ ] Business: click a top-up to see its events on the bus and the bridge's log lines (`routes.logsFor(reference)`) once the collector indexes references (#—)
 - [ ] Business: raise reconciliation anomalies as alerts (rules on `confirmed-not-credited`, `credited-twice`, DLQ depth > 0) (#—)
 - [ ] Business: time range for the top-up window (7 days is fixed in the contract today) (#—)
@@ -68,11 +58,24 @@ _(no active branch)_
 - [ ] `nexuswatch/agent` container from the Settings design: heartbeats, metrics, logs to the server (#—)
 
 ### Infra
-- [ ] CI workflow (build, lint, test) — once a remote exists (#—)
 - [ ] Per-target metrics token (`NW_METRICS_TOKEN` is one token for every target; hosted and community NexusInfra may differ) (#—)
 - [ ] FinVault has no `/metrics` — request rate / 5xx for its gateway once it exports them (#—)
 
 ## Done
+### `feature/polish` — merged into `dev`
+- [x] Pages load lazily (main bundle 596 → 346 kB); all pages swept at 390 / 1440 px in a production build (#—)
+- [x] Live alerts: acknowledge and resolve keep time and note; mute one alert; "until resolved" silences end with the alert (#—)
+- [x] Monitors from the dashboard: add on Heartbeats, pause / resume / remove on Service detail; same host rules as channels (#—)
+- [x] Optional login (`NW_DASHBOARD_PASSWORD`): session cookie, rate-limited, `/status` public; Settings warns without it (#—)
+- [x] CI on every push to dev/staging/main and every PR: build, lint, test, both images (#—)
+- [x] `npm run dev` starts without a root `.env`; `/health` reports the package version (#—)
+- [x] Charts draw a short live series against "now" (`slots`); the requests chart scales to its data (`niceMax`) (#—)
+- [x] Node / bus-source alerts link to Heartbeats; host card says "no nodes reporting"; Overview events open the line in Logs (#—)
+- [x] Overview top-up / payment tiles are unknown (null) without a bus; every page checked at 390 px and 1440 px for overflow and errors (#—)
+### `feature/notification-setup` — merged into `dev`
+- [x] Set up Discord, Telegram, ntfy and email in Settings: write-only, validated (fixed hosts, no local/metadata addresses), `NW_*` wins (#—)
+- [x] "Test now" on Service detail runs a real health check; Overview shows the real check interval (#—)
+- [x] Settings → Agents shows NexusInfra's node agents in live mode, without the fictional token / install snippet (#—)
 ### `feature/release` — merged into `dev`
 - [x] Docker Engine source: top consumers, NexusInfra containers, memory / disk IO / network, host name (#—)
 - [x] Live SLOs, incidents and `/status`; no sample data anywhere once a source is set (#—)

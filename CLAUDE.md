@@ -160,6 +160,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `dashboard/index.html` | Viewport (`viewport-fit=cover`), `theme-color`, manifest + apple-touch-icon links, and a pre-paint script that applies the stored theme |
 | `dashboard/public/` | `favicon.svg`, PWA `manifest.webmanifest`, icons (`icon*.svg` sources → `icon-192/512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`), `sw.js` (app-shell service worker, never caches `/api`) |
 | `dashboard/scripts/render-icons.sh` | Regenerates the PNG icons from the SVG sources with headless Chrome |
+| `.github/workflows/ci.yml` | Every push to dev/staging/main and every PR: build, lint, test, and both images built (not pushed) |
 | `.github/workflows/release.yml` | On a `v*` tag: build/lint/test, push `ghcr.io/<owner>/nexuswatch/{collector,dashboard}:<version>` + `latest`, create the GitHub release |
 | `.claude/launch.json` | Browser-preview entries: `dashboard` (sample data), `dashboard+collector` |
 | `.env.example` | Every collector variable (sources, notification targets, timings, retention prune) |
@@ -169,7 +170,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 ### dashboard/src
 | Path | Contents |
 |---|---|
-| `main.tsx` · `App.tsx` | Providers (React Query, theme) + the route table (`routeTable`, exported for tests) |
+| `main.tsx` · `App.tsx` | Providers (React Query, theme, 401 → re-ask auth) + the route table (`routeTable`, exported for tests). Every page but Overview is a lazy route (own chunk); tests that check the location after navigating must `waitFor` it |
 | `pwa.ts` | `registerServiceWorker()` — production builds only |
 | `routes.ts` | **Every URL in the app.** Build links from here, never from string literals. `logsFor(q, entryId)` deep-links into Logs: unfiltered search on `q`, that line selected |
 | `theme.tsx` | `ThemeProvider`/`useTheme` — dark (default) / light / system, stored in localStorage, sets `data-theme` on `<html>`; pure `resolveTheme` |
@@ -191,9 +192,14 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `lib/useMediaQuery.ts` | `useMediaQuery`, `useIsNarrow` and `NARROW_QUERY` (`max-width: 820px`) — the one breakpoint, also used in `app.css` |
 | `components/layout/nav.ts` | **Every nav entry** (`NAV`) for both shells, plus pure `tabItems`, `moreItems`, `isNavActive`, `isMoreActive`, `titleFor`. A new page adds one entry here |
 | `components/layout/` | `AppShell` (background, sidebar *or* mobile bars, outlet, `theme-color` sync), `Sidebar` + `NavEntry` (desktop), `MobileNav` (`MobileTopBar`, `MobileTabBar` with the More sheet), `HostCard`, `Logo` |
+| `components/layout/AuthGate.tsx` · `pages/Login.tsx` | Shows the login screen instead of the shell while `/auth` says a password is required; any 401 re-asks (`main.tsx`) |
 | `components/ui/Sheet.tsx` | Modal bottom / full-screen sheet: focus trap (`trapIndex`), Escape + backdrop close, inert page, focus returns to the opener |
 | `lib/reconcile.ts` | Pure top-up reconciliation: `reconcile` (pipeline steps, outcome, anomalies with reasons), `reconcileAll`, `summarize` (success rate, median time to credit, open anomalies), `median`. Rules follow NexusInfra's Billing Bridge (#298, #351) |
 | `lib/business.ts` | Pure Business helpers: `maskEmail`, `creditState`/`sortByHoursLeft`/`formatHoursLeft` (standing, #365/#379), `describeDlq` (#243 wording) |
+| `lib/channels.ts` | Notification channel setup: `CHANNEL_FIELDS` (the form), `validateChannelConfig` (shared by form, mock and collector), `isBlockedHost`, `maskChannelTarget` |
+| `lib/monitors.ts` | `validateMonitor` (form, mock and collector; same host rules as channels), `monitorId`, `MONITOR_INTERVALS` |
+| `pages/heartbeats/AddMonitor.tsx` | The "+ Add monitor" dialog on Heartbeats |
+| `pages/settings/ChannelSetup.tsx` | The write-only "Set up / Change" dialog for a notification channel |
 | `lib/rules.ts` | Pure alerting logic: `METRICS`, parse/format/validate rule conditions and durations, `evaluateReading`/`evaluateRule`, rule drafts (editor state), silences, maintenance windows, `escalationProgress`, `filterHistory` |
 | `lib/useNow.ts` | `useNow(ms)` — ticking clock for countdowns |
 | `components/ui/Card.tsx` | `Card` + `CardHeader` (title, hint, right-side content or "→" link) |
@@ -219,7 +225,9 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `config.ts` | `loadConfig(env)` — every `NW_*` variable, validated; a source is off until its variable is set |
 | `contract.ts` · `sample.ts` | Re-export the dashboard's `api/types.ts` and `api/mock/data.ts` (never copied) |
 | `routes.ts` | **Every endpoint, one table** (`/health` + docs/api.md); add an endpoint here |
-| `server.ts` | Express app: routes under `/api`, `/health` at the root, `HttpError` → status + text |
+| `server.ts` | Express app: routes under `/api` (behind the login middleware), `/api/auth/*`, `/health` at the root, `HttpError` → status + text |
+| `monitors.ts` | Monitors added from the dashboard (SQLite) joining `config.health.targets`; pause set; `addMonitor` / `removeMonitor` / `pauseMonitor`; `ctx.monitors` (wired in `index.ts`) schedules them |
+| `auth.ts` | Optional login (`NW_DASHBOARD_PASSWORD`): hashed sessions in SQLite, HttpOnly cookie, 5 wrong tries/min per address, `isPublic` paths |
 | `store.ts` | SQLite (`node:sqlite`): logs, checks, samples, heartbeat sources, incidents, key/value, business events (never pruned); `prune`, `usage` |
 | `duration.ts` | `parseDuration('14d')`, time ranges |
 | `sources/health.ts` | Heartbeat checker: `checkOnce`, `runHealthCheck` (logs + incidents) |
@@ -235,6 +243,7 @@ stored and why in prose. The schema's source of truth will be the migrations dir
 | `alerting/readings.ts` | `liveReadings`: stored checks and node samples as `Reading`s at a fixed step (unknown = `null`); `bucketsBack` |
 | `alerting/evaluate.ts` | `evaluateRules` / `rulesTask`: opens and closes `rule:<ruleId>:<target>` incidents; `testRuleLive`, `currentReading`, `parseSubject` |
 | `notify/channels.ts` | One sender per channel (Discord, Telegram, ntfy, email), `send()` that never throws, `maskTarget`, error scrubbing |
+| `notify/targets.ts` | Channel targets set up in Settings (SQLite, write-only), `effectiveTargets` (NW_* wins), `configureChannel` / `removeChannel` |
 | `notify/dispatch.ts` | `notifyOnce` / `notifyTask`: firing + resolved per incident, once, with retries, state in the store; `testChannel` for "Send test" |
 | `notify/mailer.ts` | nodemailer transport behind the `Mailer` type |
 | `sources/scheduler.ts` · `sources/types.ts` | Per-task intervals, no overlap, last run/error for `/health`; `Fetch`/`Clock` types |
@@ -284,9 +293,17 @@ stored and why in prose. The schema's source of truth will be the migrations dir
   tracker), `rule:<ruleId>:<target>` (rule evaluation). `alertTarget()` in `views/alerts.ts` is the one place that reads it.
 - **Mock functions that validate against sample data take the real list as an optional argument**
   (`createMaintenance(input, known)`), so the collector can pass the monitored services.
-- **A notification target never crosses the API.** Targets come from `NW_*` variables only; `Channel.target`
-  is masked and `PATCH /settings` keeps nothing of a channel but `enabled`. Never add an endpoint that
-  accepts a URL for the collector to call, and send every channel error through `send()`, which scrubs secrets.
+- **A notification target is write-only.** It comes from `NW_*` variables (which win) or from
+  `PUT /settings/channels/:id`, validated by `validateChannelConfig` in `lib/channels.ts` — Discord only at
+  discord.com, Telegram without any URL, ntfy/SMTP never at a loopback, link-local or metadata address. It is
+  never returned: `Channel.target` is masked, `PATCH /settings` keeps nothing of a channel but `enabled`.
+  Any other endpoint that takes a URL for the collector to call needs the same host checks. Send every
+  channel error through `send()`, which scrubs secrets.
+- **`config.health.targets` is the one monitor list and changes at runtime** (monitors added from the dashboard
+  are pushed into it). Read it each time; never copy it at start. A monitor's `source` is absent for
+  `NW_HEALTH_TARGETS` and `dashboard` for added ones; only those can be removed.
+- **A new public endpoint goes in `isPublic` (`auth.ts`)** — everything else needs a session once a password is
+  set. `/status` must stay public; never make a write public.
 - **Route handlers may be async** (`server.ts` awaits them); a rejected promise reaches the error handler.
 - **Every timestamp in the contract is UTC ISO-8601;** formatting to local time happens only in `lib/format.ts`.
 - **Disabled buttons mark unbuilt actions** (`title="Coming soon"`). Wire them through a mutation in

@@ -52,10 +52,12 @@ interface LineChartProps {
   dangerFrom?: number;
   /** Fraction of the width the data spans (the rest is left empty, e.g. no answers). */
   span?: number;
+  /** Points in the whole window: a shorter live series is drawn against the right edge ("now"). */
+  slots?: number;
 }
 
 /** Multi-series line chart, scaled to its container width. */
-export function LineChart({ series, label, height = 200, max = 100, yLabels, xLabels, area, dangerFrom, span = 1 }: LineChartProps) {
+export function LineChart({ series, label, height = 200, max = 100, yLabels, xLabels, area, dangerFrom, span = 1, slots }: LineChartProps) {
   const W = 900;
   const H = height;
   const gutter = yLabels ? 44 : 0;
@@ -74,9 +76,9 @@ export function LineChart({ series, label, height = 200, max = 100, yLabels, xLa
           )}
           <GridLines w={W} h={H} />
           {dangerFrom !== undefined && <rect x={W * dangerFrom} y="0" width={W * (1 - dangerFrom)} height={H} style={{ fill: 'var(--c-down)', opacity: 0.14 }} />}
-          {area && series[0] && <path d={areaPath(series[0].values, W, H, max)} fill={`url(#${gradientId})`} />}
+          {area && series[0] && <path d={areaPath(series[0].values, W, H, max, slots)} fill={`url(#${gradientId})`} />}
           {series.map((s) => (
-            <path key={s.name} d={linePath(s.values, W, H, max, W * span)} className="ln" style={{ stroke: chartColor(s.color) }} />
+            <path key={s.name} d={linePath(s.values, W, H, max, W * span, slots)} className="ln" style={{ stroke: chartColor(s.color) }} />
           ))}
         </svg>
         {yLabels && (
@@ -102,10 +104,13 @@ export function Sparkline({ values, color, label, height = 28, max = 100 }: { va
 }
 
 /** Vertical bars; the newest bar is fully opaque. Heights are relative to the peak. */
-export function BarChart({ values, color, height = 120, label }: { values: number[]; color: string; height?: number; label: string }) {
+export function BarChart({ values, color, height = 120, label, slots = values.length }: { values: number[]; color: string; height?: number; label: string; slots?: number }) {
   const heights = barHeights(values);
+  // A shorter (live) series keeps its bars at the right, under "now", with empty slots before it.
+  const empty = Math.max(0, slots - values.length);
   return (
     <div className="bars" role="img" aria-label={label} style={{ height }}>
+      {Array.from({ length: empty }, (_, i) => <span key={`e${i}`} style={{ height: 0 }} />)}
       {heights.map((h, i) => (
         <span key={i} style={{ height: `${h}%`, background: color, opacity: i === heights.length - 1 ? 1 : 0.78 }} />
       ))}

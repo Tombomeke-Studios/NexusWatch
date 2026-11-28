@@ -32,4 +32,22 @@ describe('Settings → Notifications', () => {
     expect(screen.getAllByText(/Test sent/)).toHaveLength(1);
     expect(within(outcome.parentElement as HTMLElement).getByText('Discord')).toBeInTheDocument();
   });
+
+  it('sets up Telegram write-only: checks the fields, saves, and never shows the token again', async () => {
+    renderSettings();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Notifications' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Set up Telegram' });
+    const token = within(dialog).getByLabelText('Bot token');
+    expect(token).toHaveAttribute('type', 'password');
+    fireEvent.change(token, { target: { value: 'nope' } });
+    expect(within(dialog).getByText(/Must look like 123456:ABC-DEF/)).toBeInTheDocument();
+
+    fireEvent.change(token, { target: { value: '123456:ABCdefGHIjklMNOpqrSTUvwxYZ_12345' } });
+    fireEvent.change(within(dialog).getByLabelText('Chat id'), { target: { value: '-100123' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByDisplayValue('chat -100123 via bot ••••2345')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/ABCdefGHI/)).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
 });

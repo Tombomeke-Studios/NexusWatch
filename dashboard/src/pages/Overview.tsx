@@ -9,6 +9,7 @@ import { QueryState } from '@/components/ui/QueryState';
 import { config } from '@/lib/config';
 import { formatClock, formatEur, formatLatency, formatPercent } from '@/lib/format';
 import { axisLabels, TIME_RANGES } from '@/lib/ranges';
+import { niceMax } from '@/lib/series';
 import { levelPill, projectColor, projectName, statusText } from '@/lib/status';
 import { routes } from '@/routes';
 
@@ -69,24 +70,24 @@ function OverviewBody({ data, filter, range }: { data: OverviewData; filter: Fil
           label="FinVault top-ups"
           labelColor="var(--fv)"
           swatch="var(--c-fv)"
-          value={kpis.topupsToday}
-          unit="today"
-          foot={<Sparkline values={kpis.topupsTrend} color="var(--c-fv)" label="Top-up trend" />}
+          value={kpis.topupsToday ?? 'unknown'}
+          unit={kpis.topupsToday === null ? undefined : 'today'}
+          foot={kpis.topupsToday === null ? 'needs the event bus' : <Sparkline values={kpis.topupsTrend} color="var(--c-fv)" label="Top-up trend" />}
         />
         <Kpi
           accent="nx"
           label="NexusInfra payments"
           labelColor="var(--primary)"
           swatch="var(--c-nx)"
-          value={formatEur(kpis.paymentsMonthEur, true)}
-          unit="this month"
-          foot={<Sparkline values={kpis.paymentsTrend} color="var(--c-nx)" label="Payment trend" />}
+          value={kpis.paymentsMonthEur === null ? 'unknown' : formatEur(kpis.paymentsMonthEur, true)}
+          unit={kpis.paymentsMonthEur === null ? undefined : 'this month'}
+          foot={kpis.paymentsMonthEur === null ? 'needs the event bus' : <Sparkline values={kpis.paymentsTrend} color="var(--c-nx)" label="Payment trend" />}
         />
       </section>
 
       <div className="cols">
         <Card labelledBy="hb" style={{ flex: '2 1 560px', minWidth: 0 }}>
-          <CardHeader id="hb" title="Heartbeats" hint="last 48 checks · every 30 s" link={{ to: routes.heartbeats, label: 'All monitors' }} />
+          <CardHeader id="hb" title="Heartbeats" hint={`last 48 checks${data.checkIntervalSeconds ? ` · every ${data.checkIntervalSeconds} s` : ''}`} link={{ to: routes.heartbeats, label: 'All monitors' }} />
           <div style={{ display: 'flex', flexDirection: 'column', padding: '6px 8px 10px' }}>
             {services.map((s) => (
               <Link key={s.id} className="row" to={routes.service(s.id)}>
@@ -114,7 +115,7 @@ function OverviewBody({ data, filter, range }: { data: OverviewData; filter: Fil
           <CardHeader id="ev" title="Recent events" link={{ to: routes.logs, label: 'Open logs' }} />
           <div style={{ display: 'flex', flexDirection: 'column', padding: '8px 8px 12px' }}>
             {data.events.map((e) => (
-              <div key={e.id} className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+              <Link key={e.id} className="row" to={routes.logsFor(e.service, e.id)} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
                 <Pill tone={levelPill[e.level]} style={{ marginTop: 2 }}>{e.level}</Pill>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 13, lineHeight: 1.45 }}>{e.message}</div>
@@ -122,7 +123,7 @@ function OverviewBody({ data, filter, range }: { data: OverviewData; filter: Fil
                     {formatClock(e.time)} · {e.service}
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </Card>
@@ -131,13 +132,15 @@ function OverviewBody({ data, filter, range }: { data: OverviewData; filter: Fil
       <div className="cols">
         <Card padded labelledBy="c1" style={{ flex: '1 1 400px', minWidth: 0 }}>
           <CardHeader flat id="c1" title="CPU per node" end={<Legend series={data.cpuByNode} />} />
-          <LineChart label="CPU usage per node" series={data.cpuByNode} yLabels={['100%', '75', '50', '25', '0']} xLabels={xLabels} />
+          <LineChart label="CPU usage per node" series={data.cpuByNode} slots={60} yLabels={['100%', '75', '50', '25', '0']} xLabels={xLabels} />
         </Card>
         <Card padded labelledBy="c2" style={{ flex: '1 1 400px', minWidth: 0 }}>
           <CardHeader flat id="c2" title="Requests & errors" end={<Legend series={[{ name: 'req/s', color: 'nx' }, { name: '5xx', color: 'down' }]} />} />
           <LineChart
             label="Requests per second and 5xx errors"
             area
+            slots={60}
+            max={niceMax([...data.requests.rps, ...data.requests.errors5xx])}
             series={[
               { name: 'req/s', color: 'nx', values: data.requests.rps },
               { name: '5xx', color: 'down', values: data.requests.errors5xx },
@@ -154,14 +157,14 @@ function OverviewBody({ data, filter, range }: { data: OverviewData; filter: Fil
             <div className="lbl" style={{ color: 'var(--fv)', marginBottom: 10, textTransform: 'none', fontSize: 13 }}>
               <Swatch color="var(--c-fv)" /> FinVault · top-ups per hour
             </div>
-            <BarChart values={data.topupsPerHour} color="var(--c-fv)" label="FinVault top-ups per hour" />
+            <BarChart values={data.topupsPerHour} slots={24} color="var(--c-fv)" label="FinVault top-ups per hour" />
             <XAxis labels={['00:00', '06:00', '12:00', '18:00', 'now']} />
           </div>
           <div style={{ flex: '1 1 380px', minWidth: 0 }}>
             <div className="lbl" style={{ color: 'var(--primary)', marginBottom: 10, textTransform: 'none', fontSize: 13 }}>
               <Swatch color="var(--c-nx)" /> NexusInfra · payments per day
             </div>
-            <BarChart values={data.paymentsPerDay} color="var(--c-nx)" label="NexusInfra payments per day" />
+            <BarChart values={data.paymentsPerDay} slots={30} color="var(--c-nx)" label="NexusInfra payments per day" />
             <XAxis labels={axisLabels('30d')} />
           </div>
         </div>

@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useSettings, useTestChannel, useUpdateSettings } from '@/api/queries';
+import { useAuth, useLogout, useRemoveChannel, useSettings, useTestChannel, useUpdateSettings } from '@/api/queries';
 import type { Channel, ChannelId, SettingsData, Severity } from '@/api/types';
 import { Card, CardHeader } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/Dialog';
+import { ChannelSetupDialog } from './settings/ChannelSetup';
 import { StackBar } from '@/components/ui/charts';
 import { Icon } from '@/components/ui/Icon';
 import { PageHeader, Pill, Segmented, Swatch, Switch } from '@/components/ui/primitives';
@@ -21,9 +23,21 @@ const TABS: { id: Tab; label: string }[] = [
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('agents');
   const query = useSettings();
+  const auth = useAuth();
+  const logout = useLogout();
   return (
     <>
-      <PageHeader title="Settings" subtitle={<>Agents, notifications, storage and appearance{config.useMocks && ' · sample data'}</>} />
+      <PageHeader title="Settings" subtitle={<>Agents, notifications, storage and appearance{config.useMocks && ' · sample data'}</>}>
+        {auth.data?.required && (
+          <button type="button" className="btn" disabled={logout.isPending} onClick={() => logout.mutate()}>Log out</button>
+        )}
+      </PageHeader>
+      {!config.useMocks && auth.data && !auth.data.required && (
+        <div className="box" role="note" style={{ padding: '12px 18px', borderColor: 'var(--c-warn)', fontSize: 13.5 }}>
+          <strong>No password set.</strong> Anyone who can open this dashboard can change its notifications and alerting.
+          Set <span className="mono">NW_DASHBOARD_PASSWORD</span> on the collector to require a login.
+        </div>
+      )}
       <div style={{ alignSelf: 'flex-start' }}>
         <Segmented tabs label="Settings" options={TABS} value={tab} onChange={setTab} />
       </div>
@@ -48,14 +62,24 @@ function Agents({ data }: { data: SettingsData }) {
     '  -v /var/run/docker.sock:/var/run/docker.sock:ro \\',
     '  nexuswatch/agent:latest',
   ].join('\n');
+  // NexusInfra's own node agents: nothing to install, token or rotate here.
+  const nexusInfra = data.agentSource === 'nexusinfra';
   return (
     <>
       <Card labelledBy="ag">
-        <CardHeader id="ag" title="Node agents" hint="send heartbeats, metrics and logs to your home server" end={<button type="button" className="btn pri" disabled title="Coming soon">+ Add agent</button>} />
+        <CardHeader
+          id="ag"
+          title="Node agents"
+          hint={nexusInfra ? "NexusInfra's node agents, heard on the event bus" : 'send heartbeats, metrics and logs to your home server'}
+          end={nexusInfra ? undefined : <button type="button" className="btn pri" disabled title="Coming soon">+ Add agent</button>}
+        />
+        {nexusInfra && data.agents.length === 0 && (
+          <p className="muted" style={{ margin: 0, padding: '14px 20px' }}>No node agent reported yet. They appear here once a NexusInfra node agent sends its heartbeat on the bus.</p>
+        )}
         <div className="tbl">
           <div className="tr th" style={{ minWidth: 760 }}>
             <span style={{ flex: '2 1 160px' }}>Name</span>
-            <span style={{ flex: '2 1 200px' }}>Token</span>
+            <span style={{ flex: '2 1 200px' }}>{nexusInfra ? 'Address' : 'Token'}</span>
             <span style={{ flex: '1 1 80px' }}>Version</span>
             <span style={{ flex: '1 1 110px' }}>Last seen</span>
             <span style={{ flex: '1 1 90px' }}>Status</span>
@@ -67,21 +91,28 @@ function Agents({ data }: { data: SettingsData }) {
                 {a.name}
                 <span className="mono subtle" style={{ fontWeight: 400, fontSize: 12, display: 'block' }}>{a.host}</span>
               </span>
-              <span className="mono muted" data-label="Token" style={{ flex: '2 1 200px', fontSize: 12.5 }}>{a.tokenHint ? `nw_agent_••••••••${a.tokenHint}` : '— NexusInfra node agent'}</span>
+              <span className="mono muted" data-label={nexusInfra ? 'Address' : 'Token'} style={{ flex: '2 1 200px', fontSize: 12.5 }}>{nexusInfra ? a.host : `nw_agent_••••••••${a.tokenHint}`}</span>
               <span className="mono muted" data-label="Version" style={{ flex: '1 1 80px' }}>{a.version}</span>
               <span className="mono muted" data-label="Last seen" style={{ flex: '1 1 110px' }}>{a.lastSeenSeconds} s ago</span>
               <span style={{ flex: '1 1 90px' }}><Pill tone={statusPill[a.status]}>{statusLabel[a.status]}</Pill></span>
               <span className="r" style={{ flex: '0 0 80px' }}>
-                <button type="button" className="btn sm" disabled title="Coming soon">Rotate</button>
+                {!nexusInfra && <button type="button" className="btn sm" disabled title="Coming soon">Rotate</button>}
               </span>
             </div>
           ))}
         </div>
       </Card>
-      <Card padded labelledBy="in">
-        <CardHeader flat id="in" title="Connect a new node" hint="run this on the machine you want to monitor" />
-        <pre className="code">{snippet}</pre>
-      </Card>
+      {nexusInfra ? (
+        <Card padded labelledBy="in">
+          <CardHeader flat id="in" title="Add a node" />
+          <p className="muted" style={{ margin: 0 }}>Add the node in NexusInfra; its node agent publishes a heartbeat with CPU, memory and disk, and NexusWatch picks it up from the bus.</p>
+        </Card>
+      ) : (
+        <Card padded labelledBy="in">
+          <CardHeader flat id="in" title="Connect a new node" hint="run this on the machine you want to monitor" />
+          <pre className="code">{snippet}</pre>
+        </Card>
+      )}
     </>
   );
 }
@@ -97,7 +128,11 @@ const SEVERITIES: Severity[] = ['critical', 'warning', 'info'];
 /** One channel: what it is, where it sends (masked), a test button with its outcome, and its switch. */
 function ChannelRow({ channel: c, onToggle }: { channel: Channel; onToggle: (enabled: boolean) => void }) {
   const test = useTestChannel();
+  const remove = useRemoveChannel();
+  const [editing, setEditing] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const outcome = test.isError ? { ok: false, detail: 'The test could not be started' } : test.data;
+  const fromEnv = c.source === 'env';
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', padding: '16px 20px', borderBottom: '1px solid var(--surface2)' }}>
       <div style={{ flex: '1 1 220px' }}>
@@ -116,14 +151,38 @@ function ChannelRow({ channel: c, onToggle }: { channel: Channel; onToggle: (ena
       )}
       <button
         type="button"
+        className={`btn${c.configured ? '' : ' pri'}`}
+        disabled={fromEnv}
+        title={fromEnv ? 'Set by the collector\'s environment (.env) — change it there' : undefined}
+        onClick={() => setEditing(true)}
+      >
+        {fromEnv ? 'Set in .env' : c.configured ? 'Change' : 'Set up'}
+      </button>
+      {c.source === 'settings' && (
+        <button type="button" className="btn" onClick={() => setRemoving(true)}>Remove</button>
+      )}
+      <button
+        type="button"
         className="btn"
         disabled={!c.configured || test.isPending}
-        title={c.configured ? undefined : 'Set its target on the collector first'}
+        title={c.configured ? undefined : 'Set it up first'}
         onClick={() => test.mutate(c.id)}
       >
         {test.isPending ? 'Sending…' : 'Send test'}
       </button>
-      <Switch on={c.enabled} label={`${c.name} enabled`} onChange={onToggle} />
+      <Switch on={c.enabled} label={`${c.name} enabled`} disabled={!c.configured} onChange={onToggle} />
+      {editing && <ChannelSetupDialog channel={c} onClose={() => setEditing(false)} />}
+      {removing && (
+        <ConfirmDialog
+          title={`Remove ${c.name}?`}
+          confirmLabel="Remove"
+          busy={remove.isPending}
+          onCancel={() => setRemoving(false)}
+          onConfirm={() => remove.mutate(c.id, { onSuccess: () => setRemoving(false) })}
+        >
+          Notifications stop going to {c.target}. You can set it up again at any time.
+        </ConfirmDialog>
+      )}
       {/* Always mounted so a screen reader announces the outcome when it arrives. */}
       <div role="status" style={{ flex: '1 1 100%', fontSize: 13, color: outcome?.ok ? 'var(--ok)' : 'var(--down)' }} hidden={!outcome || test.isPending}>
         {outcome && (outcome.ok ? `Test sent — ${outcome.detail}` : `Test failed — ${outcome.detail}`)}

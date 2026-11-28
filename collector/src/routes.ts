@@ -3,6 +3,8 @@
  * returns the type from contract.ts (falling back to the dashboard's sample generator while no
  * source feeds it). Paths are relative to `/api`.
  */
+import { readFileSync } from 'node:fs';
+import { configureChannel, removeChannel } from './notify/targets.js';
 import type { CollectorHealth, LogLevel, MetricId, ProjectId } from './contract.js';
 import { isRange, type Range } from './duration.js';
 import { testChannel } from './notify/dispatch.js';
@@ -11,7 +13,8 @@ import type { Ctx } from './views/ctx.js';
 import { logs } from './views/logs.js';
 import { metric, metricsOverview } from './views/metrics.js';
 import { finVault, heartbeats, host, navCounts, nexusInfra, overview } from './views/pages.js';
-import { serviceDetail } from './views/services.js';
+import { checkService, monitors, serviceDetail } from './views/services.js';
+import { addMonitor, pauseMonitor, removeMonitor } from './monitors.js';
 import { sampledRoutes } from './views/sampled.js';
 import { settings, updateSettings, type SettingsPatch } from './views/settings.js';
 
@@ -39,7 +42,8 @@ export interface Route {
   handle: RouteHandler;
 }
 
-const VERSION = '0.1.0';
+/** The collector's own version, from its package.json (bumped per release). */
+const VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
 const METRIC_IDS: MetricId[] = ['cpu', 'memory', 'disk', 'network', 'queues'];
 const LEVELS: LogLevel[] = ['error', 'warn', 'info', 'ok'];
 const PROJECTS: ProjectId[] = ['nexusinfra', 'finvault'];
@@ -112,6 +116,21 @@ export const routes: Route[] = [
     path: '/services/:id',
     handle: (ctx, { params }) => serviceDetail(ctx, params.id) ?? (() => { throw new HttpError(404, `Service ${params.id} not found`); })(),
   },
+  {
+    method: 'POST',
+    path: '/monitors',
+    handle: (ctx, { body }) => {
+      const { id } = addMonitor(ctx, body);
+      return monitors(ctx).find((m) => m.serviceId === id);
+    },
+  },
+  { method: 'DELETE', path: '/monitors/:id', handle: (ctx, { params }) => (removeMonitor(ctx, params.id), null) },
+  { method: 'PUT', path: '/monitors/:id/paused', handle: (ctx, { params, body }) => (pauseMonitor(ctx, params.id, body), null) },
+  {
+    method: 'POST',
+    path: '/services/:id/check',
+    handle: async (ctx, { params }) => (await checkService(ctx, params.id)) ?? (() => { throw new HttpError(404, `Service ${params.id} is not monitored`); })(),
+  },
   { method: 'GET', path: '/projects/nexusinfra', handle: (ctx) => nexusInfra(ctx) },
   { method: 'GET', path: '/projects/finvault', handle: (ctx) => finVault(ctx) },
   { method: 'GET', path: '/settings', handle: (ctx) => settings(ctx) },
@@ -128,6 +147,9 @@ export const routes: Route[] = [
       return null;
     },
   },
+  // Write-only: the body is validated and stored, never returned (Channel.target is masked).
+  { method: 'PUT', path: '/settings/channels/:id', handle: (ctx, { params, body }) => (configureChannel(ctx, params.id, body), null) },
+  { method: 'DELETE', path: '/settings/channels/:id', handle: (ctx, { params }) => (removeChannel(ctx, params.id), null) },
   {
     method: 'POST',
     path: '/settings/channels/:id/test',

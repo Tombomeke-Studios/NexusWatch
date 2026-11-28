@@ -3,8 +3,9 @@ import { errorText, type Clock, type Task, type TaskStatus } from './types.js';
 /** Runs each task on its own interval, never overlapping with itself, and remembers how it went. */
 export class Scheduler {
   private readonly status = new Map<string, TaskStatus>();
-  private readonly timers: ReturnType<typeof setInterval>[] = [];
+  private readonly timers = new Map<string, ReturnType<typeof setInterval>>();
   private readonly running = new Set<string>();
+  private started = false;
 
   constructor(
     private readonly tasks: Task[],
@@ -39,12 +40,35 @@ export class Scheduler {
   }
 
   start(): void {
+    this.started = true;
     void this.runAll();
-    for (const t of this.tasks) this.timers.push(setInterval(() => void this.runTask(t), t.intervalMs));
+    for (const t of this.tasks) this.timers.set(t.name, setInterval(() => void this.runTask(t), t.intervalMs));
   }
 
   stop(): void {
-    this.timers.splice(0).forEach(clearInterval);
+    this.started = false;
+    for (const timer of this.timers.values()) clearInterval(timer);
+    this.timers.clear();
+  }
+
+  /** Adds a task while running (a monitor added from the dashboard): runs it now, then on its interval. */
+  add(task: Task): void {
+    this.remove(task.name);
+    this.tasks.push(task);
+    this.status.set(task.name, { name: task.name, intervalMs: task.intervalMs, lastRunAt: null, lastOkAt: null, lastError: null });
+    if (!this.started) return;
+    void this.runTask(task);
+    this.timers.set(task.name, setInterval(() => void this.runTask(task), task.intervalMs));
+  }
+
+  /** Stops and forgets a task. */
+  remove(name: string): void {
+    const timer = this.timers.get(name);
+    if (timer) clearInterval(timer);
+    this.timers.delete(name);
+    const i = this.tasks.findIndex((t) => t.name === name);
+    if (i >= 0) this.tasks.splice(i, 1);
+    this.status.delete(name);
   }
 
   /** Lets other parts (the event bus) report into the same status list. */

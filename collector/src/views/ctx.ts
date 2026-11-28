@@ -2,7 +2,7 @@
  * What every view gets. `live` says, per part of the API, whether a source is configured for it;
  * a part that is not live is answered from the dashboard's sample data.
  */
-import type { Config } from '../config.js';
+import type { Config, HealthTarget } from '../config.js';
 import type { Mailer, NotifyDeps } from '../notify/channels.js';
 import { sample } from '../sample.js';
 import type { Store } from '../store.js';
@@ -41,6 +41,8 @@ export interface Ctx {
   startedAt: number;
   /** What the notification senders use to reach the outside world. */
   notify: NotifyDeps;
+  /** Set by index.ts once the scheduler runs: starts / stops checking a monitor added or removed at runtime. */
+  monitors?: { scheduled: (t: HealthTarget) => void; unscheduled: (id: string) => void };
 }
 
 export function liveFor(config: Config): Live {
@@ -59,13 +61,13 @@ export function liveFor(config: Config): Live {
   };
 }
 
-export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[]; fetch?: Fetch; mail?: Mailer | null } = {}): Ctx {
+export function createCtx(store: Store, config: Config, opts: { clock?: Clock; tasks?: () => TaskStatus[]; fetch?: Fetch; mail?: Mailer | null; mailer?: (smtpUrl: string) => Mailer } = {}): Ctx {
   const clock = opts.clock ?? Date.now;
   // Alerting and incident writes from an earlier run (views/persist.ts).
   restoreState(store, Object.values(liveFor(config)).some(Boolean));
   return {
     store, config, clock, sample, live: liveFor(config), tasks: opts.tasks ?? (() => []), startedAt: clock(),
-    notify: { fetch: opts.fetch ?? fetch, mail: opts.mail ?? null, timeoutMs: config.notify.timeoutMs },
+    notify: { fetch: opts.fetch ?? fetch, mail: opts.mail ?? null, ...(opts.mailer ? { mailer: opts.mailer } : {}), timeoutMs: config.notify.timeoutMs },
   };
 }
 

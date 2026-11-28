@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import type { SettingsData } from '../contract.js';
 import { parseDuration } from '../duration.js';
 import { CHANNEL_VARIABLES, maskTarget } from '../notify/channels.js';
+import { effectiveTargets, targetSource } from '../notify/targets.js';
 import type { RetentionKind } from '../store.js';
 import type { Ctx } from './ctx.js';
 
@@ -32,6 +33,7 @@ export function settings(ctx: Ctx): SettingsData {
     ...base,
     // Live: the agents are NexusInfra's node agents heard on the bus or reported by the Control Room
     // (NexusWatch's own agent is not built, so there is no token to show).
+    agentSource: ctx.live.logs ? 'nexusinfra' : base.agentSource,
     agents: ctx.live.logs
       ? ctx.store.sources('node').map((n) => ({
           id: n.name,
@@ -46,14 +48,24 @@ export function settings(ctx: Ctx): SettingsData {
     serverUrl: ctx.config.notify.publicUrl ?? (ctx.live.logs ? 'set NW_PUBLIC_URL' : base.serverUrl),
     // Where a channel sends to is the collector's configuration, shown masked; only its switch is stored.
     channels: base.channels.map((c) => {
-      const target = maskTarget(c.id, ctx.config.notify.targets);
+      const targets = effectiveTargets(ctx);
+      const target = maskTarget(c.id, targets);
       const saved = stored.channels?.find((x) => x.id === c.id);
-      return { ...c, enabled: saved?.enabled ?? c.enabled, configured: target !== null, target: target ?? `Not configured — set ${CHANNEL_VARIABLES[c.id]}` };
+      const source = targetSource(ctx, c.id);
+      // A channel is on once it has a target, unless someone switched it off.
+      return { ...c, enabled: target !== null && (saved?.enabled ?? true), configured: target !== null, source, target: target ?? `Not set up — use "Set up", or set ${CHANNEL_VARIABLES[c.id]}` };
     }),
     routing: stored.routing ? { ...base.routing, ...stored.routing } : base.routing,
     retention,
     storage: { usedBytes: usage.fileBytes, totalBytes: diskBytes(ctx.store.path) ?? base.storage.totalBytes },
   };
+}
+
+/** Switches one channel on or off (setting a channel up switches it on). */
+export function setChannelEnabled(ctx: Ctx, id: string, enabled: boolean): void {
+  const stored = ctx.store.get<Stored>(KEY) ?? {};
+  const channels = (stored.channels ?? []).filter((c) => c.id !== id);
+  ctx.store.set(KEY, { ...stored, channels: [...channels, { id, enabled }] });
 }
 
 /** Throws (→ 400) on a retention value that is not one of its options or not a duration. */

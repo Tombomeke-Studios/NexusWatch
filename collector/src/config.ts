@@ -19,6 +19,8 @@ export interface HealthTarget {
   port: string;
   intervalMs: number;
   timeoutMs: number;
+  /** Absent = from NW_HEALTH_TARGETS; `dashboard` = added on Heartbeats (stored in SQLite). */
+  source?: 'dashboard';
 }
 
 export interface MetricsTarget {
@@ -32,12 +34,15 @@ export interface Config {
   dbPath: string;
   /** `explicit` = NW_HOST_NAME was set; otherwise the Docker host's name is preferred when known. */
   host: { name: string; address: string | null; explicit: boolean };
-  health: { targets: HealthTarget[]; slowMs: number; failuresForIncident: number };
+  /** `timeoutMs`: NW_HEALTH_TIMEOUT_MS, also for monitors added from the dashboard. */
+  health: { targets: HealthTarget[]; slowMs: number; failuresForIncident: number; timeoutMs: number };
   controlRoom: { url: string; intervalMs: number; nodePattern: RegExp } | null;
   metrics: { targets: MetricsTarget[]; intervalMs: number; token: string | undefined };
   bus: { url: string; queue: string } | null;
   /** The Docker Engine socket of this machine (read-only use): containers, CPU, memory, network. */
   docker: { socket: string; intervalMs: number } | null;
+  /** The dashboard's password (NW_DASHBOARD_PASSWORD); null = no login. */
+  dashboardPassword: string | null;
   /** Availability objective for each monitored service's SLO, in percent. */
   sloTargetPct: number;
   /** NexusInfra's billing settings, so the dashboard judges top-ups by the bridge's own clock. */
@@ -154,6 +159,12 @@ function notifyTargets(env: Env): NotifyTargets {
   };
 }
 
+function dashboardPassword(raw: string | undefined): string | null {
+  if (!raw) return null;
+  if (raw.length < 8) throw new Error('NW_DASHBOARD_PASSWORD must be at least 8 characters');
+  return raw;
+}
+
 export function loadConfig(env: Env = process.env, readFile: (path: string) => string = (p) => readFileSync(p, 'utf8')): Config {
   const intervalMs = num(env, 'NW_HEALTH_INTERVAL_MS', 30_000);
   const timeoutMs = num(env, 'NW_HEALTH_TIMEOUT_MS', 5_000);
@@ -171,6 +182,7 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
       targets,
       slowMs: num(env, 'NW_HEALTH_SLOW_MS', 100),
       failuresForIncident: Math.max(1, num(env, 'NW_HEALTH_FAILURES_FOR_INCIDENT', 3)),
+      timeoutMs,
     },
     controlRoom: env.NW_CONTROL_ROOM_URL
       ? {
@@ -186,6 +198,7 @@ export function loadConfig(env: Env = process.env, readFile: (path: string) => s
     },
     docker: env.NW_DOCKER_SOCKET ? { socket: env.NW_DOCKER_SOCKET, intervalMs: Math.max(5_000, num(env, 'NW_DOCKER_INTERVAL_MS', 15_000)) } : null,
     bus: env.NW_RABBITMQ_URL ? { url: env.NW_RABBITMQ_URL, queue: env.NW_RABBITMQ_QUEUE || 'nexuswatch.collector' } : null,
+    dashboardPassword: dashboardPassword(env.NW_DASHBOARD_PASSWORD),
     sloTargetPct: Math.min(99.999, num(env, 'NW_SLO_TARGET', 99.5)),
     // Defaults are the Billing Bridge's (TOPUP_TIMEOUT_MS, LOW_CREDIT_HOURS); set them to match NexusInfra's.
     business: { topUpTimeoutMs: num(env, 'NW_TOPUP_TIMEOUT_MS', 30 * 60_000), lowCreditHours: num(env, 'NW_LOW_CREDIT_HOURS', 24) },

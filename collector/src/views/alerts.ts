@@ -6,7 +6,8 @@
  */
 import { formatCondition, windowCovers } from '../../../dashboard/src/lib/rules.js';
 import { currentReading, parseSubject } from '../alerting/evaluate.js';
-import type { ActiveAlert, AlertRule, AlertsData, Incident, MaintenanceWindow, Silence } from '../contract.js';
+import type { ActiveAlert, AlertNote, AlertRule, AlertsData, Incident, MaintenanceWindow, Silence } from '../contract.js';
+import { HttpError } from '../routes.js';
 import type { IncidentRow } from '../store.js';
 import { DAY_MS, iso, seconds, type Ctx } from './ctx.js';
 import { saveState } from './persist.js';
@@ -28,18 +29,62 @@ function acknowledged(ctx: Ctx): Set<string> {
   return new Set(ctx.store.get<string[]>(ACKS) ?? []);
 }
 
+const LIVE = 'alerts.live';
+/** What people did to live alerts: when each was acknowledged, and the notes (oldest first). */
+interface LiveAlertState {
+  acknowledgedAt: Record<string, string>;
+  notes: Record<string, AlertNote[]>;
+}
+const liveState = (ctx: Ctx): LiveAlertState => ({ acknowledgedAt: {}, notes: {}, ...ctx.store.get<LiveAlertState>(LIVE) });
+
+function addLiveNote(ctx: Ctx, state: LiveAlertState, id: string, kind: AlertNote['kind'], text: string): void {
+  const notes = state.notes[id] ?? [];
+  state.notes[id] = [...notes, { id: `${id}-n${notes.length + 1}`, kind, text: text.trim(), at: iso(ctx.clock()) }];
+}
+
+function openIncident(ctx: Ctx, id: string): IncidentRow {
+  const i = ctx.store.incidents(0).find((x) => x.id === id && x.endedAt === null);
+  if (!i) throw new HttpError(404, `Alert ${id} is not active`);
+  return i;
+}
+
 /**
- * Sample alerts are acknowledged in the sample module (which keeps the time and the note; 404 when
- * the alert is not active) and snapshotted; live alerts only record that they were acknowledged.
+ * Sample alerts are acknowledged in the sample module and snapshotted. Live ones keep the time and the
+ * note in the store; 404 when the alert is not open.
  */
 export function acknowledge(ctx: Ctx, id: string, note = ''): void {
   if (!ctx.live.logs) {
     ctx.sample.acknowledgeAlert(id, note);
     saveState(ctx.store);
+  } else {
+    openIncident(ctx, id);
+    const state = liveState(ctx);
+    if (!state.acknowledgedAt[id]) {
+      state.acknowledgedAt[id] = iso(ctx.clock());
+      addLiveNote(ctx, state, id, 'acknowledged', note);
+      ctx.store.set(LIVE, state);
+    }
   }
   const acks = acknowledged(ctx);
   acks.add(id);
   ctx.store.set(ACKS, [...acks]);
+}
+
+/**
+ * "Resolve" on a live alert: closes its incident now, with the note. If the source still fails, the
+ * checker opens a new incident on its next check — resolving does not hide a real outage.
+ */
+export function resolveLive(ctx: Ctx, id: string, note = ''): void {
+  const i = openIncident(ctx, id);
+  const state = liveState(ctx);
+  addLiveNote(ctx, state, id, 'resolved', note);
+  ctx.store.set(LIVE, state);
+  ctx.store.closeIncidents(i.subject, ctx.clock());
+}
+
+/** Live: the open alerts a silence may point at. */
+export function openAlertTargets(ctx: Ctx): { id: string; title: string; ruleId: string }[] {
+  return ctx.store.incidents(0).filter((i) => i.endedAt === null).map((i) => ({ id: i.id, title: i.title, ruleId: alertTarget(i).ruleId }));
 }
 
 export function rules(ctx: Ctx): AlertRule[] {
@@ -62,7 +107,15 @@ interface Suppressors {
 
 export function suppressors(ctx: Ctx): Suppressors {
   const { silences, maintenance } = ctx.sample.alerts();
-  return { silences, maintenance };
+  if (!ctx.live.logs) return { silences, maintenance };
+  // Live: an "until resolved" silence ends once nothing it covers is open any more.
+  const open = openAlertTargets(ctx);
+  const done = silences.filter((s) => s.endsAt === null && (s.kind === 'alert' ? !open.some((a) => a.id === s.targetId) : !open.some((a) => a.ruleId === s.targetId)));
+  if (done.length) {
+    for (const s of done) ctx.sample.deleteSilence(s.id);
+    saveState(ctx.store);
+  }
+  return { silences: silences.filter((s) => !done.includes(s)), maintenance };
 }
 
 /** Which rule and target an incident stands for, whoever opened it. */
@@ -85,6 +138,7 @@ export function suppression(ctx: Ctx, i: IncidentRow, by: Suppressors = suppress
 
 function activeFromIncidents(ctx: Ctx, now: number, by: Suppressors, ruleSet: AlertRule[]): ActiveAlert[] {
   const acks = acknowledged(ctx);
+  const live = liveState(ctx);
   return ctx.store
     .incidents(now)
     .filter((i) => i.endedAt === null)
@@ -118,10 +172,9 @@ function activeFromIncidents(ctx: Ctx, now: number, by: Suppressors, ruleSet: Al
         value: measured ? measured.value : target.isService ? 'timeout' : 'offline',
         trend,
         acknowledged: acks.has(i.id),
-        // Not tracked live yet: when it was acknowledged, and notes.
-        acknowledgedAt: null,
+        acknowledgedAt: live.acknowledgedAt[i.id] ?? null,
         ...suppression(ctx, i, by),
-        notes: [],
+        notes: live.notes[i.id] ?? [],
       };
     });
 }
@@ -137,9 +190,12 @@ export function activeAlerts(ctx: Ctx): ActiveAlert[] {
 export function alerts(ctx: Ctx): AlertsData {
   if (!ctx.live.logs) return { ...ctx.sample.alerts(), active: activeAlerts(ctx), rules: rules(ctx) };
   const now = ctx.clock();
-  const base = ctx.sample.alerts();
-  const active = activeFromIncidents(ctx, now, base, rules(ctx));
+  // Prunes finished "until resolved" silences before anything reads them.
+  const by = suppressors(ctx);
+  const base = { ...ctx.sample.alerts(), silences: by.silences };
+  const active = activeFromIncidents(ctx, now, by, rules(ctx));
   const month = ctx.store.incidents(now - 30 * DAY_MS);
+  const notesFor = liveState(ctx).notes;
   const resolved = month.filter((i) => i.endedAt !== null);
   const resolved24h = resolved.filter((i) => (i.endedAt as number) >= now - DAY_MS).length;
   const mttr = resolved.length ? resolved.reduce((sum, i) => sum + ((i.endedAt as number) - i.startedAt), 0) / resolved.length / 60_000 : 0;
@@ -154,8 +210,8 @@ export function alerts(ctx: Ctx): AlertsData {
       muted: base.silences.length,
       inMaintenance: active.filter((a) => a.maintenanceId).length,
       resolved24h,
-      // Nobody resolves incidents by hand yet: every resolution is the condition clearing.
-      resolvedAuto24h: resolved24h,
+      // Resolved without a person's "Resolve": the condition cleared on its own.
+      resolvedAuto24h: resolved.filter((i) => (i.endedAt as number) >= now - DAY_MS && !(notesFor[i.id] ?? []).some((n) => n.kind === 'resolved')).length,
       mttrMinutes: Math.round(mttr),
     },
     active,
@@ -169,7 +225,7 @@ export function alerts(ctx: Ctx): AlertsData {
       severity: i.severity,
       startedAt: iso(i.startedAt),
       durationSeconds: seconds((i.endedAt ?? now) - i.startedAt),
-      notes: [],
+      notes: notesFor[i.id] ?? [],
     })),
   };
 }

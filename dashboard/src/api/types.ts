@@ -71,10 +71,26 @@ export interface Monitor {
   target: string;
   uptimePct: number;
   status: HealthStatus;
-  avgLatencyMs: number;
+  /** null = no check answered in 24 h (unknown, not 0). */
+  avgLatencyMs: number | null;
   nowLatencyMs: number | null;
   /** One status per day, oldest first (60 entries). */
   days: HealthStatus[];
+  /** `env`: from the collector's NW_HEALTH_TARGETS (read-only here); `dashboard`: added on Heartbeats. */
+  source: MonitorSource;
+  /** Paused monitors are not checked; their history stays. */
+  paused: boolean;
+}
+
+export type MonitorSource = 'env' | 'dashboard';
+
+/** Body of `POST /monitors`. */
+export interface NewMonitor {
+  name: string;
+  project: ProjectId;
+  url: string;
+  /** One of 15, 30, 60, 120, 300; default 30. */
+  intervalSeconds?: number;
 }
 
 export interface Incident {
@@ -139,9 +155,11 @@ export interface OverviewData {
     p95Trend: number[];
     openAlerts: number;
     openAlertsSummary: string;
-    topupsToday: number;
+    /** null = not measured (the collector has no event bus to read top-ups from). */
+    topupsToday: number | null;
     topupsTrend: number[];
-    paymentsMonthEur: number;
+    /** null = not measured, like `topupsToday`. */
+    paymentsMonthEur: number | null;
     paymentsTrend: number[];
   };
   services: ServiceSummary[];
@@ -150,6 +168,8 @@ export interface OverviewData {
   requests: { rps: number[]; errors5xx: number[] };
   topupsPerHour: number[];
   paymentsPerDay: number[];
+  /** How often the health checks run (the shortest interval); null when nothing is checked. */
+  checkIntervalSeconds: number | null;
 }
 
 // ── Metrics ────────────────────────────────────────────────────────────
@@ -352,9 +372,12 @@ export interface ServiceDetail {
   service: ServiceSummary;
   target: string;
   intervalSeconds: number;
+  /** Where the monitor comes from and whether it is paused (see `Monitor`). */
+  source: MonitorSource;
+  paused: boolean;
   downSince: string | null;
   failure: string | null;
-  kpis: { uptime24h: number; downtime24hSeconds: number; uptime30d: number; incidents30d: number; avgLatencyMs: number; p95LatencyMs: number; lastCheckAt: string; lastCheckNote: string; restarts24h: number };
+  kpis: { uptime24h: number; downtime24hSeconds: number; uptime30d: number; incidents30d: number; avgLatencyMs: number | null; p95LatencyMs: number | null; lastCheckAt: string; lastCheckNote: string; restarts24h: number };
   /** Response time per check over 24h; null = no answer. */
   responseTimes: (number | null)[];
   checks: HealthStatus[];
@@ -445,9 +468,37 @@ export interface Channel {
   description: string;
   /** Where it sends to, masked: the real target is a secret that lives in the backend's configuration. */
   target: string;
-  /** False while the backend has no target for it; then `target` says what to set. */
+  /** False while the backend has no target for it; then `target` says how to set one up. */
   configured: boolean;
+  /**
+   * Where the target comes from: `env` (the collector's NW_* variables — they win and cannot be changed
+   * here), `settings` (entered on the Settings page), null while not set up.
+   */
+  source: ChannelSource | null;
   enabled: boolean;
+}
+
+export type ChannelSource = 'env' | 'settings';
+
+/**
+ * Body of `PUT /settings/channels/:id`: the fields `CHANNEL_FIELDS` (lib/channels.ts) lists for that
+ * channel. Write-only — the API never returns it, only the masked `Channel.target`.
+ */
+export type ChannelConfig = Record<string, string>;
+
+/** `GET /auth`: whether the dashboard needs a login (NW_DASHBOARD_PASSWORD) and whether this browser has one. */
+export interface AuthState {
+  required: boolean;
+  authenticated: boolean;
+}
+
+/** Answer of `POST /services/:id/check` ("Test now"): one health check, run right away and stored. */
+export interface ServiceCheckResult {
+  at: string;
+  status: HealthStatus;
+  /** null = no answer. */
+  latencyMs: number | null;
+  note: string;
 }
 
 /** Answer of `POST /settings/channels/:id/test`. A failed delivery is a result, not an HTTP error. */
@@ -458,6 +509,11 @@ export interface ChannelTestResult {
 }
 
 export interface SettingsData {
+  /**
+   * Who the agents are: `nexuswatch` = NexusWatch's own agent (tokens, install snippet); `nexusinfra` =
+   * NexusInfra's node agents heard on the bus — nothing to install or rotate here.
+   */
+  agentSource: 'nexuswatch' | 'nexusinfra';
   agents: Agent[];
   serverUrl: string;
   channels: Channel[];
